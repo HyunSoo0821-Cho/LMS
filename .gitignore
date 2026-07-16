@@ -1,0 +1,38 @@
+# 환경 변수 / 시크릿 (API 토큰 포함 — 절대 커밋 금지)
+.env
+.env.local
+*.local
+
+# 의존성
+node_modules/
+
+# 로그
+*.log
+npm-debug.log*
+
+# 캐시 / 임시 데이터 스냅샷 (실제 임직원 PII 포함 가능)
+data-snapshot.json
+cache/
+
+# 계정 저장소 (비밀번호 해시 + 세션 시크릿 — 커밋 금지)
+users.json
+
+# 런타임 데이터 (관리자 편집 공지)
+notices.json
+
+# 런타임 데이터 (신청·이력·조직도 명단 — 실명/이메일 PII 포함, 커밋 금지)
+reminders.json
+org-data.json
+enroll-requests.json
+individual-learning.json
+approvals.json
+custom-courses.json
+questions.json
+search-keywords.json
+
+# 원본 조직도 엑셀 (PII 포함)
+*.xlsx
+
+# OS
+.DS_Store
+Thumbs.db

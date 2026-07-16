@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Native 역량진단</title>
+<style>
+  :root{
+    --ink:#161B2E; --ink2:#4A5270; --paper:#EDF0F6; --surface:#FFFFFF;
+    --line:#DBE1EC; --accent:#0FA9A2; --accent-deep:#0A7671; --accent-soft:#E3F5F3;
+    --muted:#98A1B6; --muted-soft:#EEF0F5;
+    --good:#2E9E6B; --warn:#D89A2E; --danger:#D6564C;
+    --shadow:0 1px 2px rgba(22,27,46,.06),0 8px 24px rgba(22,27,46,.06);
+    --r:14px;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    line-height:1.55; letter-spacing:-.01em;
+  }
+  .wrap{max-width:860px; margin:0 auto; padding:40px 20px 80px}
+  header.top{margin-bottom:28px}
+  .eyebrow{font-size:12px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--accent-deep)}
+  h1{font-size:30px; font-weight:800; margin:6px 0 8px; letter-spacing:-.03em}
+  .lead{color:var(--ink2); font-size:15px; max-width:60ch}
+  .card{background:var(--surface); border:1px solid var(--line); border-radius:var(--r); box-shadow:var(--shadow)}
+  .pad{padding:22px}
+  .row{display:flex; gap:14px; flex-wrap:wrap}
+  .field{flex:1; min-width:180px}
+  label.f{display:block; font-size:12px; font-weight:700; color:var(--ink2); margin-bottom:6px; letter-spacing:.02em}
+  select{width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:10px; background:var(--surface); font:inherit; color:var(--ink)}
+  select:focus{outline:2px solid var(--accent); outline-offset:1px}
+
+  .scale-note{display:flex; gap:8px; flex-wrap:wrap; font-size:12px; color:var(--ink2); margin-top:2px}
+  .scale-note span{background:var(--muted-soft); padding:3px 8px; border-radius:999px}
+
+  .group{margin-top:26px}
+  .group-head{display:flex; align-items:baseline; gap:10px; margin:0 2px 10px}
+  .chip{font-size:11px; font-weight:800; letter-spacing:.06em; color:#fff; background:var(--ink); border-radius:6px; padding:3px 8px}
+  .chip.evof{background:var(--accent-deep)}
+  .chip.meas{background:var(--muted)}
+  .chip.eth{background:var(--warn)}
+  .group-title{font-size:16px; font-weight:800}
+  .group-sub{font-size:12px; color:var(--muted); font-weight:600}
+
+  .q{padding:16px 18px; border-top:1px solid var(--line)}
+  .q:first-child{border-top:0}
+  .q .qtext{font-size:14.5px; font-weight:600; margin-bottom:12px}
+  .q .code{color:var(--accent-deep); font-weight:800; margin-right:6px}
+
+  .likert{display:flex; gap:8px}
+  .likert label{flex:1; position:relative}
+  .likert input{position:absolute; opacity:0; inset:0; cursor:pointer}
+  .likert .box{display:flex; flex-direction:column; align-items:center; gap:3px; padding:9px 4px; border:1px solid var(--line); border-radius:10px; cursor:pointer; transition:.12s}
+  .likert .box b{font-size:16px; font-weight:800}
+  .likert .box small{font-size:10px; color:var(--muted); line-height:1.15; text-align:center}
+  .likert label:hover .box{border-color:var(--accent)}
+  .likert input:checked + .box{background:var(--accent-soft); border-color:var(--accent); color:var(--accent-deep)}
+  .likert input:focus-visible + .box{outline:2px solid var(--accent); outline-offset:1px}
+
+  .opts{display:flex; flex-direction:column; gap:8px}
+  .opts label{display:flex; gap:10px; align-items:flex-start; padding:11px 13px; border:1px solid var(--line); border-radius:10px; cursor:pointer; transition:.12s; font-size:14px}
+  .opts input{position:absolute; opacity:0}
+  .opts .dot{flex:none; width:18px; height:18px; margin-top:1px; border:2px solid var(--line); border-radius:50%; transition:.12s}
+  .opts label:hover{border-color:var(--accent)}
+  .opts input:checked + .dot{border-color:var(--accent); background:radial-gradient(circle at center, var(--accent) 0 5px, transparent 6px)}
+  .opts input:checked ~ .otext{color:var(--accent-deep); font-weight:600}
+  .opts label:has(input:checked){background:var(--accent-soft); border-color:var(--accent)}
+  .opts input:focus-visible + .dot{outline:2px solid var(--accent); outline-offset:2px}
+
+  .actionbar{position:sticky; bottom:0; margin-top:26px; padding:14px 0}
+  .btn{display:inline-flex; align-items:center; justify-content:center; gap:8px; width:100%; padding:15px 18px; border:0; border-radius:12px; background:var(--accent); color:#fff; font:inherit; font-weight:800; font-size:16px; cursor:pointer; box-shadow:0 6px 18px rgba(15,169,162,.32); transition:.14s}
+  .btn:hover{background:var(--accent-deep)}
+  .btn.ghost{background:var(--surface); color:var(--ink); border:1px solid var(--line); box-shadow:none}
+  .progress{font-size:12.5px; color:var(--ink2); text-align:center; margin-bottom:8px; font-weight:600}
+  .progress b{color:var(--accent-deep)}
+
+  /* results */
+  .res-head{display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap}
+  .level-badge{font-size:13px; font-weight:800; color:#fff; background:var(--accent-deep); border-radius:999px; padding:6px 14px}
+  .gauge{display:flex; gap:6px; margin:16px 0 4px}
+  .gauge .seg{flex:1; text-align:center; font-size:12.5px; font-weight:700; color:var(--muted); padding:9px 6px; border-radius:9px; background:var(--muted-soft); border:1px solid transparent}
+  .gauge .seg.on{color:var(--accent-deep); background:var(--accent-soft); border-color:var(--accent)}
+  .kv{display:flex; gap:22px; flex-wrap:wrap; font-size:13.5px; color:var(--ink2); margin-top:10px}
+  .kv b{color:var(--ink)}
+
+  .bars{margin-top:6px}
+  .bar-row{display:grid; grid-template-columns:132px 1fr 42px; align-items:center; gap:12px; padding:7px 0}
+  .bar-name{font-size:13px; font-weight:700; display:flex; align-items:center; gap:6px}
+  .tag{font-size:10px; font-weight:800; padding:2px 6px; border-radius:5px; background:var(--muted-soft); color:var(--muted)}
+  .tag.lv{background:var(--accent-soft); color:var(--accent-deep)}
+  .track{position:relative; height:16px; background:var(--muted-soft); border-radius:8px; overflow:hidden}
+  .fill{height:100%; border-radius:8px; width:0; transition:width .6s cubic-bezier(.2,.7,.2,1)}
+  .fill.evof{background:linear-gradient(90deg,var(--accent),var(--accent-deep))}
+  .fill.meas{background:repeating-linear-gradient(45deg,var(--muted) 0 6px,#aab2c4 6px 12px)}
+  .bar-val{font-size:13px; font-weight:800; text-align:right}
+  .thresh{position:absolute; top:-3px; bottom:-3px; width:2px; background:var(--danger)}
+  .thresh-note{font-size:11.5px; color:var(--danger); font-weight:700; margin:8px 2px 0}
+
+  .rec{margin-top:8px; border:1px solid var(--line); border-radius:12px; overflow:hidden}
+  .rec-h{display:flex; align-items:center; gap:8px; padding:11px 14px; background:var(--accent-soft); font-weight:800; font-size:14px; color:var(--accent-deep)}
+  .rec-h .sc{margin-left:auto; font-size:12px; color:var(--ink2); font-weight:700}
+  .rec-b{padding:6px 14px 12px}
+  .course{display:flex; gap:9px; padding:8px 0; border-top:1px dashed var(--line); font-size:13.5px}
+  .course:first-child{border-top:0}
+  .course .mk{flex:none; color:var(--accent)}
+  .fallback{font-size:13px; color:var(--ink2); background:var(--muted-soft); border-radius:8px; padding:9px 11px; margin-top:6px}
+  .deep{background:#FFF6E7; color:#8a6414}
+  .strong-note{font-size:13px; color:var(--ink2); margin-top:14px}
+  .rstat{display:inline-flex; gap:8px; align-items:center; font-weight:800; font-size:13.5px; padding:8px 13px; border-radius:10px}
+  .rstat.badge{background:#E8F6EE; color:var(--good)}
+  .rstat.gate{background:#FBEEED; color:var(--danger)}
+  .rstat.none{background:var(--muted-soft); color:var(--ink2)}
+
+  .foot{font-size:12px; color:var(--muted); margin-top:26px; line-height:1.7}
+  .hidden{display:none}
+  .sec-label{font-size:12px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin:22px 2px 8px}
+  @media(max-width:560px){
+    .bar-row{grid-template-columns:96px 1fr 38px}
+    h1{font-size:25px}
+  }
+  @media(prefers-reduced-motion:reduce){.fill{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="eyebrow">사내 교육 · 프로토타입</div>
+    <h1>AI Native 역량진단</h1>
+    <p class="lead">20개 문항에 답하면 6개 역량을 진단해 레벨을 판정하고, 약점 역량에 맞는 강의를 추천합니다. 결과는 이 화면에서 바로 계산되며 저장되지 않습니다. <b>추천 강의는 사내 인원의 인프런 수강이력 15건을 데모 시드로 사용</b>하며, 실제 추천 풀은 향후 인프런에서 확보합니다.</p>
+  </header>
+
+  <!-- 진단 화면 -->
+  <div id="survey">
+    <div class="card pad">
+      <div class="row">
+        <div class="field">
+          <label class="f" for="job">직무</label>
+          <select id="job"><option value="nondev">비개발 직무</option><option value="dev">개발 직무</option></select>
+        </div>
+        <div class="field">
+          <label class="f" for="rank">직급</label>
+          <select id="rank"><option value="mid">일반</option><option value="junior">신입·주니어</option><option value="senior">시니어</option></select>
+        </div>
+      </div>
+      <div style="margin-top:14px">
+        <label class="f">일반 문항 응답 기준 (1~5)</label>
+        <div class="scale-note">
+          <span>1 전혀 아니다</span><span>2 아니다</span><span>3 보통</span><span>4 그렇다</span><span>5 매우 그렇다</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="questions"></div>
+
+    <div class="actionbar">
+      <div class="progress" id="progress"></div>
+      <button class="btn" id="submit">결과 보기</button>
+    </div>
+  </div>
+
+  <!-- 결과 화면 -->
+  <div id="result" class="hidden"></div>
+</div>
+
+<script>
+"use strict";
+
+/* ---------- 데이터 (기획서 v3.1 / 평가지 v0.7 기준) ---------- */
+const COMPS = {
+  E:{name:"실행력", role:"evof"},
+  V:{name:"반복·검증", role:"evof"},
+  P:{name:"문제정의·골설정", role:"meas"},
+  O:{name:"오케스트레이션", role:"evof"},
+  C:{name:"경쟁력 재발견", role:"meas"},
+  F:{name:"AI 활용·적응력", role:"evof"},
+  R:{name:"윤리·책임", role:"eth"}
+};
+const ORDER = ["E","V","P","O","C","F","R"];
+
+// 시나리오: 보기 표시순서대로, 각 보기의 환산점수
+const Q = {
+  E:[
+    {code:"E1", text:"새 업무가 생기면 완벽한 계획보다 AI로 일단 초안·시제품을 만들어 본다"},
+    {code:"E2", text:"‘이게 될까’ 고민하는 시간보다 직접 해보고 결과로 다음을 정하는 편이다"},
+    {code:"E3", scen:true, text:"3일 안에 새 아이디어를 검증해야 한다. 나의 첫 행동은?", opts:[
+      ["AI로 ‘작동하는 데모(POC)’부터 만들어 보여준다",5],
+      ["상세 기획서부터 완성한다",2],
+      ["자료·경쟁 사례를 폭넓게 조사한다",3],
+      ["검증을 미루거나 아이디어를 접는다",1],
+      ["부서 회의로 방향을 먼저 합의한다",4]]},
+  ],
+  V:[
+    {code:"V1", text:"AI 결과가 기대와 다르면 포기하지 않고 입력을 바꿔가며 원하는 결과에 수렴시킨다"},
+    {code:"V2", text:"AI 산출물(약 80% 품질)을 그대로 쓰지 않고 검증·보완해 완성도를 끌어올린다"},
+    {code:"V3", scen:true, text:"AI가 만든 보고서에 사실과 다른 내용이 섞였다. 어떻게 하나?", opts:[
+      ["대체로 맞으니 그대로 사용한다",1],
+      ["출처를 교차검증해 오류를 바로잡고 프롬프트를 고쳐 재생성한다",5],
+      ["어색한 부분만 눈대중으로 수정한다",3],
+      ["신뢰하기 어려워 처음부터 수작업으로 다시 한다",2],
+      ["AI에게 다시 시켜 고쳐지길 반복한다",4]]},
+  ],
+  P:[
+    {code:"P1", text:"AI에게 시키기 전에 ‘무엇을 왜 해결하려는지’를 먼저 정의한다"},
+    {code:"P2", text:"AI를 활용해 혼자서는 어려웠던 높은 수준의 목표에 도전한다"},
+    {code:"P3", scen:true, text:"반복되는 수작업 업무를 개선하려 한다. 가장 먼저 하는 일은?", opts:[
+      ["남들이 쓰는 도구부터 찾아본다",3],
+      ["일단 익숙한 기존 방식을 유지한다",1],
+      ["업무의 병목과 이루려는 목표부터 정의한다",5],
+      ["상사에게 방법을 물어본다",2],
+      ["눈에 띄는 AI 도구를 바로 적용해 본다",4]]},
+  ],
+  O:[
+    {code:"O1", text:"하나의 일을 단계로 나눠 각 단계에 맞는 AI 도구를 골라 연결해 처리한다"},
+    {code:"O2", text:"여러 AI·자동화 도구를 조합해 하나의 업무 흐름(워크플로우)을 구성해 본 적이 있다"},
+    {code:"O3", scen:true, text:"‘기획→초안→검수→배포’를 AI로 처리한다면 어떻게 설계하나?", opts:[
+      ["한 AI에게 전부 통으로 맡긴다",2],
+      ["단계별로 수동 복사·붙여넣기로 연결한다",3],
+      ["역할별 도구를 분담해 자동 연결(워크플로우/멀티에이전트)로 설계한다",5],
+      ["AI 없이 기존처럼 수작업한다",1],
+      ["자주 쓰는 단계 한두 개만 AI로 자동화한다",4]]},
+  ],
+  C:[
+    {code:"C1", text:"범용 AI가 대체하기 어려운 나만의 강점(도메인 지식·경험)을 설명할 수 있다"},
+    {code:"C2", text:"AI가 잘하는 일은 맡기고, 나는 내 강점에 집중하도록 업무를 재배분한다"},
+    {code:"C3", scen:true, text:"내 업무의 70%를 AI가 처리하게 됐다. 나의 역할은?", opts:[
+      ["할 일이 줄어 불안해하며 기존 방식을 고수한다",1],
+      ["남는 시간에 다른 잡무를 채운다",3],
+      ["판단·방향설정·검증 등 사람만의 역할로 나를 재정의한다",5],
+      ["시키는 일만 계속한다",2],
+      ["AI 활용법을 더 익히는 데 시간을 쓴다",4]]},
+  ],
+  F:[
+    {code:"F1", text:"새로운 AI 도구가 나오면 빠르게 익혀 업무에 적용한다"},
+    {code:"F2", text:"원하는 결과를 얻기 위해 맥락·조건·예시를 담아 명확히 지시(프롬프트)한다"},
+    {code:"F3", scen:true, text:"처음 보는 AI 도구를 이번 주 업무에 써야 한다. 어떻게 하나?", opts:[
+      ["익숙한 기존 도구만 고집한다",2],
+      ["매뉴얼을 끝까지 정독한 뒤 시작한다",3],
+      ["일단 써보며 빠르게 익히고 필요한 것만 검색한다",5],
+      ["아는 사람이 대신 해줄 때까지 기다린다",1],
+      ["기본 기능만 조금 써보고 판단한다",4]]},
+  ],
+  R:[
+    {code:"R1", text:"AI 결과물의 최종 책임은 사람에게 있다고 보고, 중요한 결정은 직접 검토·판단한다"},
+    {code:"R2", text:"민감정보·보안·저작권을 고려해 AI를 안전하게 사용한다"},
+  ]
+};
+
+// 데모 시드: 사내 인원 인프런 수강이력 15강 (확정 추천 풀 아님 — 실제 풀은 향후 인프런 확보)
+const COURSES = [
+  {t:"비개발자 4주만에 수익화 서비스: AI 바이브코딩 (웹+앱)", comp:["E"], lv:"입문", pool:true, nd:true},
+  {t:"[KDC] Rookiss의 클로드 코드 입문", comp:["E","F"], lv:"입문", pool:true, nd:true},
+  {t:"코딩 없이 AI 자동화 — n8n 완벽 가이드", comp:["O"], lv:"입문", pool:true, nd:true},
+  {t:"클로드코드 — 비개발자 기초 업무 자동화", comp:["O","F"], lv:"입문", pool:true, nd:true},
+  {t:"비개발자 직장인을 위한 Claude (Cowork+N8N+Design)", comp:["F","O"], lv:"입문", pool:true, nd:true},
+  {t:"클로드 코드 완벽 마스터", comp:["F","E"], lv:"입문", pool:true, nd:false},
+  {t:"AI로 세팅하는 제2의 뇌 — 옵시디언 지식 엔지니어링", comp:["P","O"], lv:"초급", pool:true, nd:true, indirect:true},
+  {t:"LangGraph AI Agent 개발 (feat. MCP)", comp:["O"], lv:"초급", pool:true, nd:false},
+  {t:"RAG를 활용한 LLM Application 개발 (feat. LangChain)", comp:["V"], lv:"초급", pool:true, nd:false},
+  {t:"RAG 마스터: 기초부터 고급기법까지 (feat. LangChain)", comp:["V"], lv:"초급", pool:true, nd:false},
+  {t:"TensorFlow 2.0으로 배우는 딥러닝 입문", comp:[], lv:"초급", pool:false},
+  {t:"딥러닝 CNN 완벽 가이드 (Pytorch)", comp:[], lv:"초급", pool:false},
+  {t:"[개정판] 파이썬 머신러닝 완벽 가이드", comp:[], lv:"초급", pool:false},
+  {t:"<밑바닥부터 만들면서 배우는 LLM> 해설", comp:[], lv:"초급", pool:false},
+  {t:"2,000억건 데이터 — 실리콘밸리 PostgreSQL", comp:[], lv:"입문", pool:false},
+];
+
+const round1 = x => Math.round(x*10)/10;
+const el = (tag,cls,html)=>{const e=document.createElement(tag); if(cls)e.className=cls; if(html!=null)e.innerHTML=html; return e;};
+
+/* ---------- 진단 화면 렌더 ---------- */
+const answers = {};   // code -> score
+const container = document.getElementById("questions");
+
+ORDER.forEach(k=>{
+  const c = COMPS[k];
+  const g = el("div","group");
+  const head = el("div","group-head");
+  const chipCls = c.role==="evof"?"chip evof":c.role==="meas"?"chip meas":"chip eth";
+  head.appendChild(el("span",chipCls,k));
+  head.appendChild(el("span","group-title",c.name));
+  const sub = c.role==="evof" ? "레벨 반영" : c.role==="meas" ? "측정만 · 레벨 제외" : "레벨 제외 · 책임 지표";
+  head.appendChild(el("span","group-sub","· "+sub));
+  g.appendChild(head);
+
+  const box = el("div","card");
+  Q[k].forEach(q=>{
+    const qd = el("div","q");
+    qd.appendChild(el("div","qtext",`<span class="code">${q.code}</span>${q.text}`));
+    if(q.scen){
+      const opts = el("div","opts");
+      q.opts.forEach((o,i)=>{
+        const [label,score]=o;
+        const lab = el("label");
+        lab.innerHTML = `<input type="radio" name="${q.code}" value="${score}"><span class="dot"></span><span class="otext">${label}</span>`;
+        opts.appendChild(lab);
+      });
+      qd.appendChild(opts);
+    } else {
+      const lk = el("div","likert");
+      const meanings=["전혀 아니다","아니다","보통","그렇다","매우 그렇다"];
+      for(let s=1;s<=5;s++){
+        const lab = el("label");
+        lab.innerHTML = `<input type="radio" name="${q.code}" value="${s}"><span class="box"><b>${s}</b><small>${meanings[s-1]}</small></span>`;
+        lk.appendChild(lab);
+      }
+      qd.appendChild(lk);
+    }
+    box.appendChild(qd);
+  });
+  g.appendChild(box);
+  container.appendChild(g);
+});
+
+const TOTAL = ORDER.reduce((n,k)=>n+Q[k].length,0);
+function refreshProgress(){
+  const done = Object.keys(answers).length;
+  const p = document.getElementById("progress");
+  p.innerHTML = done<TOTAL ? `응답 <b>${done}</b> / ${TOTAL}` : `모든 문항 응답 완료 (${TOTAL}/${TOTAL})`;
+}
+document.addEventListener("change", e=>{
+  if(e.target.matches('input[type=radio]')){ answers[e.target.name]=Number(e.target.value); refreshProgress(); }
+});
+refreshProgress();
+
+/* ---------- 채점 ---------- */
+function compAvg(k){
+  const vals = Q[k].map(q=>answers[q.code]).filter(v=>typeof v==="number");
+  if(!vals.length) return null;
+  return round1(vals.reduce((a,b)=>a+b,0)/vals.length);
+}
+function levelFromScore(s){ return s<2.5?"입문":s<3.8?"초급":"중급"; }
+function tierOf(level){ return level==="입문"?"입문":level==="초급"?"초급":"중급이상"; }
+
+/* ---------- 추천 로직 ---------- */
+function recommendFor(k, tier, job){
+  const cname = COMPS[k].name;
+  if(tier==="중급이상"){
+    return {deep:true, msg:`심화 트랙 — 인프런에서 ‘${cname}’ 중급+ 강의를 개설·안내`
+      + (job==="dev" ? " (사내 ML·데이터 심화 강의 병행 가능)" : "")};
+  }
+  let list = COURSES.filter(c=>c.pool && c.comp.includes(k) && c.lv===tier);
+  if(job==="nondev") list = list.slice().sort((a,b)=>(b.nd?1:0)-(a.nd?1:0));
+  if(list.length) return {courses:list};
+
+  // 폴백
+  if(tier==="초급"){
+    const alt = COURSES.filter(c=>c.pool && c.comp.includes(k) && c.lv==="입문");
+    if(alt.length) return {courses:alt, fb:"초급 전용 강의가 없어 한 단계 아래 입문 강의로 하향 대체합니다."};
+  }
+  if(tier==="입문" && k==="V"){
+    return {fb:"입문 단계 V 전용 강의가 없습니다. E·F 기초(바이브코딩·클로드코드 입문)부터 다진 뒤 초급 RAG로 이어가세요."};
+  }
+  return {fb:`현 난이도(${tier})에 ‘${cname}’ 직접 매핑 강의가 없어, 인접 난이도 또는 차순위 약점 역량 강의로 대체합니다.`};
+}
+
+/* ---------- 결과 렌더 ---------- */
+document.getElementById("submit").addEventListener("click", ()=>{
+  const done = Object.keys(answers).length;
+  if(done<TOTAL){
+    const p=document.getElementById("progress");
+    p.innerHTML = `아직 <b>${TOTAL-done}</b>개 문항이 남았습니다. 모두 응답해 주세요.`;
+    const firstUnanswered = ORDER.flatMap(k=>Q[k]).find(q=>answers[q.code]==null);
+    if(firstUnanswered){ const nd=document.querySelector(`input[name="${firstUnanswered.code}"]`); if(nd) nd.closest(".q").scrollIntoView({behavior:"smooth",block:"center"}); }
+    return;
+  }
+  const job = document.getElementById("job").value;
+  const rank = document.getElementById("rank").value;
+
+  const avg = {}; ORDER.forEach(k=>avg[k]=compAvg(k));
+  const evofVals = ["E","V","O","F"].map(k=>avg[k]);
+  const total = round1(evofVals.reduce((a,b)=>a+b,0)/4);   // 레벨 = E·V·O·F 평균 (P·C 제외)
+
+  // 직급 경계 보정
+  let level = levelFromScore(total), adj="";
+  const M=0.15;
+  if(rank==="junior"){
+    if(total>=2.5 && total<2.5+M){ level="입문"; adj="직급 보정: 경계 점수라 주니어 → 입문으로 조정"; }
+    else if(total>=3.8 && total<3.8+M){ level="초급"; adj="직급 보정: 경계 점수라 주니어 → 초급으로 조정"; }
+  } else if(rank==="senior"){
+    if(total<2.5 && total>=2.5-M){ level="초급"; adj="직급 보정: 경계 점수라 시니어 → 초급으로 조정"; }
+    else if(total<3.8 && total>=3.8-M){ level="중급"; adj="직급 보정: 경계 점수라 시니어 → 중급으로 조정"; }
+  }
+  const tier = tierOf(level);
+
+  // 약점 (절대 기준 · 준거지향): 3.5 미만
+  const WEAK_CUT = 3.5;
+  const weak = ["E","V","O","F"].filter(k=>avg[k] < WEAK_CUT);
+  const strong = ["E","V","O","F"].filter(k=>avg[k] >= WEAK_CUT);
+
+  const R = avg.R;
+  const rStatus = R>=4 ? ["badge","책임 있는 AI 사용자 — 안전·책임 사용 기준을 잘 지킵니다"]
+                : R<=2 ? ["gate","안전·책임 사용 가이드 우선 안내 대상"]
+                : ["none","윤리·책임 보통 — 특이사항 없음"];
+
+  /* build DOM */
+  const R_ = document.getElementById("result");
+  R_.innerHTML="";
+
+  const head = el("div","card pad");
+  const hr = el("div","res-head");
+  hr.appendChild(el("div",null,`<div class="eyebrow">진단 결과</div><div style="font-size:22px;font-weight:800;margin-top:4px">판정 레벨 · ${level}</div>`));
+  hr.appendChild(el("span","level-badge",`추천 난이도 ${tier}`));
+  head.appendChild(hr);
+
+  const gauge = el("div","gauge");
+  ["입문","초급","중급"].forEach(l=>gauge.appendChild(el("div","seg"+(l===level?" on":""),l)));
+  head.appendChild(gauge);
+
+  const kv = el("div","kv");
+  kv.innerHTML = `<span>전체 점수 <b>${total.toFixed(1)}</b> <small>(E·V·O·F 평균, P·C 제외)</small></span>`;
+  if(adj) kv.innerHTML += `<span style="color:var(--warn);font-weight:700">${adj}</span>`;
+  head.appendChild(kv);
+  R_.appendChild(head);
+
+  // 역량 바
+  R_.appendChild(el("div","sec-label","역량 점수"));
+  const barsCard = el("div","card pad");
+  const bars = el("div","bars");
+  const threshPct = (WEAK_CUT/5)*100;
+  ORDER.filter(k=>k!=="R").forEach(k=>{
+    const isEvof = COMPS[k].role==="evof";
+    const rowEl = el("div","bar-row");
+    const tag = isEvof ? `<span class="tag lv">레벨</span>` : `<span class="tag">측정만</span>`;
+    rowEl.appendChild(el("div","bar-name",`${k} ${COMPS[k].name} ${tag}`));
+    const track = el("div","track");
+    const fill = el("div","fill "+(isEvof?"evof":"meas"));
+    track.appendChild(fill);
+    if(isEvof){ const th=el("div","thresh"); th.style.left=threshPct+"%"; th.title="약점 기준선 3.5"; track.appendChild(th); }
+    rowEl.appendChild(track);
+    rowEl.appendChild(el("div","bar-val",avg[k].toFixed(1)));
+    bars.appendChild(rowEl);
+    requestAnimationFrame(()=>{ fill.style.width=((avg[k]/5)*100)+"%"; });
+  });
+  barsCard.appendChild(bars);
+  barsCard.appendChild(el("div","thresh-note",`빨간 선 = 약점 기준 3.5(절대 기준). 이 선 미만인 E·V·O·F 역량이 ‘약점’으로 추천 대상입니다. (레벨 경계값과는 별개)`));
+  R_.appendChild(barsCard);
+
+  // R 상태
+  R_.appendChild(el("div","sec-label","윤리·책임 (R)"));
+  const rCard = el("div","card pad");
+  rCard.appendChild(el("div","rstat "+rStatus[0], `R ${R.toFixed(1)} · ${rStatus[1]}`));
+  R_.appendChild(rCard);
+
+  // 추천
+  R_.appendChild(el("div","sec-label","약점 역량별 추천 강의"));
+  if(weak.length===0){
+    const c=el("div","card pad");
+    c.appendChild(el("div","strong-note","약점(3.5 미만) 역량이 없습니다. E·V·O·F가 모두 안정 수준입니다. 심화 트랙(인프런 중급+)으로 확장을 고려하세요."));
+    R_.appendChild(c);
+  }
+  weak.forEach(k=>{
+    const rec = recommendFor(k, tier, job);
+    const card = el("div","rec");
+    const h = el("div","rec-h");
+    h.innerHTML = `<span>${k} ${COMPS[k].name}</span><span class="sc">점수 ${avg[k].toFixed(1)} · 난이도 ${tier}</span>`;
+    card.appendChild(h);
+    const b = el("div","rec-b");
+    if(rec.courses){
+      rec.courses.forEach(c=>{
+        b.appendChild(el("div","course",`<span class="mk">▹</span><span>${c.t}${c.indirect?' <span class="tag">간접</span>':''}${c.nd?'':' <span class="tag">개발자향</span>'}</span>`));
+      });
+      if(rec.fb) b.appendChild(el("div","fallback",rec.fb));
+    } else if(rec.deep){
+      b.appendChild(el("div","fallback deep",rec.msg));
+    } else {
+      b.appendChild(el("div","fallback",rec.fb));
+    }
+    card.appendChild(b);
+    R_.appendChild(card);
+  });
+
+  if(strong.length){
+    R_.appendChild(el("div","strong-note",`기준 충족(3.5 이상) 역량: ${strong.map(k=>COMPS[k].name).join(", ")} — 추천은 생략합니다.`));
+  }
+  R_.appendChild(el("div","strong-note","※ P·C는 측정만 하며 레벨·추천에서 제외됩니다. 수강이력 시드에는 중급 강의가 없어(과거 수강 성향), 중급 판정 시 ‘심화 트랙(인프런 중급+ 확보·안내)’으로 처리됩니다."));
+
+  const again = el("div","actionbar");
+  const btn = el("button","btn ghost","처음부터 다시 하기");
+  btn.onclick=()=>{ location.reload(); };
+  again.appendChild(btn);
+  R_.appendChild(again);
+
+  document.getElementById("survey").classList.add("hidden");
+  R_.classList.remove("hidden");
+  window.scrollTo({top:0, behavior:"smooth"});
+
+  R_.appendChild(el("div","foot",
+    "AI Native 역량진단 로컬 프로토타입 · 기획서 v3.1 / 평가지 v0.7 로직 기준. "+
+    "레벨 = E·V·O·F 평균(P·C 제외), 약점 = 절대 기준 3.5 미만(준거지향), 중급 = 심화 트랙 분리. "+
+    "추천 강의 = 데모 시드(사내 인프런 수강이력 15강). 실제 추천 풀은 인프런에서 확보 예정(미정). 실서비스에는 강의 링크·약점 2·3순위 확장·조직 집계가 추가됩니다."));
+});
+</script>
+</body>
+</html>

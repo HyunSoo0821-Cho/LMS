@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EST family — 이스트소프트 사내 학습 플랫폼</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <style>
+    .nav .nav-admin { color: #4f7cff; font-weight: 800; }
+    .btn-logout { border: 1px solid #d6dbe2; background: #fff; border-radius: 8px; padding: 7px 12px; font-size: 12.5px; font-weight: 700; color: #5f676f; cursor: pointer; white-space: nowrap; }
+    .btn-logout:hover { border-color: #9aa2ad; color: #1b1e22; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand" onclick="go('#/')">
+        <img src="/estfamily.png" alt="EST family" class="brand-logo" />
+      </div>
+      <nav class="nav">
+        <a data-page="courses" onclick="go('#/courses')">강의정보</a>
+        <a data-page="apply" onclick="go('#/apply')">수강신청</a>
+        <a data-page="my" onclick="go('#/my')">내 학습</a>
+        <a data-page="illearn" onclick="go('#/illearn')">개별학습</a>
+        <a data-page="recommend" onclick="go('#/recommend')">추천강좌</a>
+        <a data-page="mypage" onclick="go('#/mypage')">마이페이지</a>
+        <a id="navAdmin" class="nav-admin" href="/admin" style="display:none">관리자 대시보드</a>
+      </nav>
+      <div class="searchbox">
+        <span class="ico" style="display:flex;align-items:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg></span>
+        <input id="hdrSearch" type="text" placeholder="원하는 강의를 찾아보세요" onkeydown="headerSearch(event)" />
+      </div>
+      <div class="topbar-right">
+        <div class="profile-chip" onclick="go('#/mypage')" style="cursor:pointer"><span class="avatar" id="hdrAvatar">ME</span><span id="hdrName"></span></div>
+        <button class="btn-logout" onclick="logout()">로그아웃</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="app">
+    <div class="loading-screen"><div class="spinner"></div>강의 데이터를 불러오는 중입니다…</div>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>

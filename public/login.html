@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EST family — 로그인</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <style>
+    body { background: #f4f6f9; }
+    .auth-wrap { min-height: 100vh; display: grid; place-items: center; padding: 30px 16px; }
+    .auth-card { width: 100%; max-width: 420px; background: #fff; border: 1px solid #e4e8ee; border-radius: 16px; padding: 34px 32px; box-shadow: 0 10px 30px rgba(20,30,60,.06); }
+    .auth-logo { display: block; height: 34px; margin: 0 auto 8px; }
+    .auth-sub { text-align: center; color: #7d8590; font-size: 13px; margin-bottom: 22px; }
+    .auth-tabs { display: flex; border-bottom: 1px solid #e4e8ee; margin-bottom: 20px; }
+    .auth-tabs button { flex: 1; background: none; border: none; padding: 11px 0; font-size: 15px; font-weight: 700; color: #9aa2ad; cursor: pointer; border-bottom: 2px solid transparent; }
+    .auth-tabs button.on { color: #1b1e22; border-bottom-color: #00c471; }
+    .fld { margin-bottom: 12px; }
+    .fld label { display: block; font-size: 12px; font-weight: 600; color: #5f676f; margin-bottom: 5px; }
+    .fld input, .fld select { width: 100%; box-sizing: border-box; border: 1px solid #d6dbe2; border-radius: 8px; padding: 11px 12px; font-size: 14px; outline: none; }
+    .fld input:focus, .fld select:focus { border-color: #00c471; }
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .auth-btn { width: 100%; background: #00c471; color: #fff; border: none; border-radius: 8px; padding: 13px 0; font-size: 15px; font-weight: 800; cursor: pointer; margin-top: 6px; }
+    .auth-btn:hover { background: #00b165; }
+    .auth-msg { min-height: 18px; font-size: 13px; margin: 10px 0 0; text-align: center; }
+    .auth-msg.err { color: #e5484d; }
+    .auth-msg.ok { color: #00a05d; }
+    .role-pick { display: flex; gap: 8px; }
+    .role-pick label { flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px; border: 1.5px solid #d6dbe2; border-radius: 8px; padding: 11px 0; font-size: 14px; font-weight: 600; cursor: pointer; color: #5f676f; }
+    .role-pick input { display: none; }
+    .role-pick label:has(input:checked) { border-color: #00c471; color: #00a05d; background: #f0fdf7; }
+    .hint { font-size: 11.5px; color: #9aa2ad; margin-top: 4px; }
+    .demo-box { margin-top: 22px; border-top: 1px dashed #d6dbe2; padding-top: 16px; }
+    .demo-title { font-size: 12px; font-weight: 700; color: #7d8590; margin-bottom: 8px; }
+    .demo-acc { width: 100%; display: flex; align-items: center; gap: 8px; background: #f7f9fb; border: 1px solid #e4e8ee; border-radius: 8px; padding: 9px 12px; margin-bottom: 6px; cursor: pointer; text-align: left; }
+    .demo-acc:hover { border-color: #00c471; background: #f0fdf7; }
+    .demo-role { flex-shrink: 0; font-size: 11px; font-weight: 800; color: #5f676f; background: #e8ecf1; border-radius: 6px; padding: 2px 8px; }
+    .demo-role.admin { color: #fff; background: #4f7cff; }
+    .demo-mail { font-size: 12.5px; font-weight: 700; color: #333; white-space: nowrap; }
+    .demo-note { font-size: 11px; color: #9aa2ad; margin-left: auto; white-space: nowrap; }
+    @media (max-width: 420px) { .demo-note { display: none; } }
+  </style>
+</head>
+<body>
+  <div class="auth-wrap">
+    <div class="auth-card">
+      <img src="/estfamily.png" alt="EST family" class="auth-logo" onerror="this.style.display='none'" />
+      <div class="auth-sub">이스트소프트 사내 학습 플랫폼</div>
+      <div class="auth-tabs">
+        <button id="tabLogin" class="on" onclick="switchTab('login')">로그인</button>
+        <button id="tabSignup" onclick="switchTab('signup')">회원가입</button>
+      </div>
+
+      <form id="loginForm" onsubmit="return doLogin(event)">
+        <div class="fld"><label>이메일</label><input id="liEmail" type="email" placeholder="name@estsoft.com" required /></div>
+        <div class="fld"><label>비밀번호</label><input id="liPw" type="password" placeholder="비밀번호" required /></div>
+        <button class="auth-btn">로그인</button>
+        <button type="button" class="auth-btn" style="background:#fff;color:#00a05d;border:1.5px solid #00c471;margin-top:8px" onclick="switchTab('signup')">회원가입</button>
+        <div class="auth-msg" id="liMsg"></div>
+      </form>
+
+      <form id="signupForm" style="display:none" onsubmit="return doSignup(event)">
+        <div class="fld"><label>계정 유형</label>
+          <div class="role-pick">
+            <label><input type="radio" name="suRole" value="user" checked />👤 사용자</label>
+            <label><input type="radio" name="suRole" value="admin" />🛠 관리자</label>
+          </div>
+        </div>
+        <div class="fld"><label>이름</label><input id="suName" placeholder="홍길동" required /></div>
+        <div class="fld"><label>이메일</label><input id="suEmail" type="email" placeholder="name@estsoft.com" required /></div>
+        <div class="row2">
+          <div class="fld"><label>사번 (UUID)</label><input id="suUuid" placeholder="예: es12" />
+            <div class="hint">인프런 수강 데이터와 연결됩니다</div></div>
+          <div class="fld"><label>소속</label><input id="suDept" placeholder="예: AI서비스팀" /></div>
+        </div>
+        <div class="fld"><label>비밀번호</label><input id="suPw" type="password" placeholder="4자 이상" required /></div>
+        <button class="auth-btn">계정 만들기</button>
+        <div class="auth-msg" id="suMsg"></div>
+      </form>
+
+      <div class="demo-box">
+        <div class="demo-title">🔑 테스트 계정 (클릭하면 자동 입력)</div>
+        <button type="button" class="demo-acc" onclick="fillDemo('admin@test.com')">
+          <span class="demo-role admin">관리자</span>
+          <span class="demo-mail">admin@test.com / test1234</span>
+          <span class="demo-note">→ /admin 관리자 콘솔 진입</span>
+        </button>
+        <button type="button" class="demo-acc" onclick="fillDemo('user@test.com')">
+          <span class="demo-role">사용자</span>
+          <span class="demo-mail">user@test.com / test1234</span>
+          <span class="demo-note">→ /admin 접근 시 차단(리다이렉트)</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const $ = (s) => document.querySelector(s);
+    const nextUrl = new URLSearchParams(location.search).get('next');
+    function switchTab(t) {
+      $('#tabLogin').classList.toggle('on', t === 'login');
+      $('#tabSignup').classList.toggle('on', t === 'signup');
+      $('#loginForm').style.display = t === 'login' ? '' : 'none';
+      $('#signupForm').style.display = t === 'signup' ? '' : 'none';
+    }
+    function landing(user) {
+      if (nextUrl) return nextUrl;
+      return '/#/'; // 사용자·관리자 동일 화면 (관리자는 메뉴바의 '관리자 대시보드' 버튼으로 진입)
+    }
+    async function post(url, body) {
+      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || 'HTTP ' + res.status);
+      return json;
+    }
+    async function doLogin(e) {
+      e.preventDefault();
+      const msg = $('#liMsg'); msg.className = 'auth-msg';
+      try {
+        const { user } = await post('/api/auth/login', { email: $('#liEmail').value.trim(), password: $('#liPw').value });
+        msg.className = 'auth-msg ok'; msg.textContent = '로그인 성공! 이동 중…';
+        location.href = landing(user);
+      } catch (err) { msg.className = 'auth-msg err'; msg.textContent = err.message; }
+      return false;
+    }
+    async function doSignup(e) {
+      e.preventDefault();
+      const msg = $('#suMsg'); msg.className = 'auth-msg';
+      try {
+        const { user } = await post('/api/auth/signup', {
+          name: $('#suName').value.trim(), email: $('#suEmail').value.trim(),
+          password: $('#suPw').value, uuid: $('#suUuid').value.trim(), dept: $('#suDept').value.trim(),
+          role: document.querySelector('input[name=suRole]:checked').value,
+        });
+        msg.className = 'auth-msg ok'; msg.textContent = '계정 생성 완료! 온보딩으로 이동합니다…';
+        location.href = user.role === 'admin' ? '/#/' : '/onboarding';
+      } catch (err) { msg.className = 'auth-msg err'; msg.textContent = err.message; }
+      return false;
+    }
+    // 테스트 계정 자동 입력
+    function fillDemo(email) {
+      switchTab('login');
+      $('#liEmail').value = email;
+      $('#liPw').value = 'test1234';
+      const msg = $('#liMsg'); msg.className = 'auth-msg ok'; msg.textContent = '테스트 계정이 입력되었습니다 — 로그인을 누르세요';
+    }
+    // 이미 로그인 상태면 바로 이동
+    fetch('/api/auth/me').then((r) => r.ok ? r.json() : null).then((d) => { if (d && d.user) location.href = landing(d.user); }).catch(() => {});
+  </script>
+</body>
+</html>

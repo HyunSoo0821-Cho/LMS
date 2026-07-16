@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>인프런 비즈니스 학습 대시보드</title>
+  <style>
+    :root {
+      --bg: #0f1117; --panel: #171a23; --panel2: #1e222d; --border: #2a2f3d;
+      --text: #e7e9ee; --muted: #9aa2b1; --accent: #4f7cff; --accent2: #22c55e;
+      --warn: #f59e0b; --danger: #ef4444; --chip: #262b38;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Malgun Gothic", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    header {
+      padding: 20px 28px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+      background: linear-gradient(180deg, #141824, #0f1117);
+    }
+    header h1 { font-size: 18px; margin: 0; display: flex; align-items: center; gap: 10px; }
+    header .logo { width: 30px; height: 30px; border-radius: 8px; background: linear-gradient(135deg, var(--accent), #7aa2ff); display: grid; place-items: center; font-weight: 800; color: #fff; }
+    header .meta { font-size: 12px; color: var(--muted); }
+    .btn { background: var(--chip); color: var(--text); border: 1px solid var(--border); padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+    .btn:hover { border-color: var(--accent); }
+    main { padding: 24px 28px; max-width: 1280px; margin: 0 auto; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-bottom: 24px; }
+    .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+    .card .label { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+    .card .value { font-size: 26px; font-weight: 700; }
+    .card .sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 24px; }
+    @media (max-width: 860px) { .grid2 { grid-template-columns: 1fr; } }
+    .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; }
+    .panel h2 { font-size: 14px; margin: 0 0 16px; color: var(--text); }
+    .bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 13px; }
+    .bar-row .name { width: 70px; color: var(--muted); flex-shrink: 0; }
+    .bar-track { flex: 1; background: var(--panel2); border-radius: 6px; height: 22px; overflow: hidden; }
+    .bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent), #7aa2ff); border-radius: 6px; transition: width .5s; }
+    .bar-row .cnt { width: 46px; text-align: right; color: var(--text); font-variant-numeric: tabular-nums; }
+    .tabs { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+    .tab { padding: 9px 16px; border-radius: 8px; cursor: pointer; font-size: 13px; color: var(--muted); border: 1px solid transparent; }
+    .tab.active { background: var(--panel); color: var(--text); border-color: var(--border); }
+    .toolbar { display: flex; gap: 10px; margin-bottom: 14px; align-items: center; flex-wrap: wrap; }
+    input[type=search] { background: var(--panel2); border: 1px solid var(--border); color: var(--text); padding: 9px 12px; border-radius: 8px; font-size: 13px; width: 260px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-weight: 600; cursor: pointer; user-select: none; position: sticky; top: 0; background: var(--panel); white-space: nowrap; }
+    th:hover { color: var(--text); }
+    td { color: var(--text); }
+    tbody tr:hover { background: var(--panel2); }
+    .table-wrap { max-height: 620px; overflow: auto; border: 1px solid var(--border); border-radius: 12px; }
+    .mini { height: 8px; background: var(--panel2); border-radius: 4px; overflow: hidden; width: 90px; display: inline-block; vertical-align: middle; }
+    .mini > span { display: block; height: 100%; background: linear-gradient(90deg, var(--accent2), #4ade80); }
+    .pill { padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+    .pill.done { background: rgba(34,197,94,.15); color: #4ade80; }
+    .pill.prog { background: rgba(79,124,255,.15); color: #7aa2ff; }
+    .pill.zero { background: rgba(154,162,177,.12); color: var(--muted); }
+    a { color: #7aa2ff; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .loading, .error { text-align: center; padding: 60px 20px; color: var(--muted); }
+    .error { color: var(--danger); }
+    .hidden { display: none; }
+    .muted { color: var(--muted); }
+    .num { font-variant-numeric: tabular-nums; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1><span class="logo">In</span> 인프런 비즈니스 학습 대시보드</h1>
+    <div style="display:flex; align-items:center; gap:14px;">
+      <span class="meta" id="genAt"></span>
+      <button class="btn" id="refreshBtn">↻ 새로고침</button>
+    </div>
+  </header>
+  <main>
+    <div id="status" class="loading">데이터를 불러오는 중입니다… (전체 학습 현황을 페이지별로 수집하므로 최초 로딩은 수 초 걸릴 수 있어요)</div>
+    <div id="content" class="hidden">
+      <div class="cards" id="cards"></div>
+      <div class="grid2">
+        <div class="panel">
+          <h2>진도율 분포</h2>
+          <div id="buckets"></div>
+        </div>
+        <div class="panel">
+          <h2>수강 많은 강의 TOP 10</h2>
+          <div id="topCourses"></div>
+        </div>
+      </div>
+      <div class="tabs" id="tabs">
+        <div class="tab active" data-tab="members">멤버 <span class="muted" id="cMembers"></span></div>
+        <div class="tab" data-tab="courses">강의 <span class="muted" id="cCourses"></span></div>
+        <div class="tab" data-tab="enrollments">수강내역 <span class="muted" id="cEnroll"></span></div>
+      </div>
+      <div class="toolbar">
+        <input type="search" id="search" placeholder="검색 (uuid, 이메일, 강의명…)" />
+        <span class="muted" id="rowCount"></span>
+      </div>
+      <div class="table-wrap">
+        <table id="table"><thead></thead><tbody></tbody></table>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const $ = (s) => document.querySelector(s);
+    let DB = null;
+    let currentTab = 'members';
+    let sortKey = null, sortDir = -1;
+
+    const fmtPct = (v) => (v == null ? '-' : v.toFixed ? v.toFixed(1) + '%' : v + '%');
+    const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+    async function load(refresh) {
+      $('#status').classList.remove('hidden'); $('#status').className = 'loading';
+      $('#status').textContent = '데이터를 불러오는 중입니다…';
+      $('#content').classList.add('hidden');
+      try {
+        const res = await fetch('/api/dashboard' + (refresh ? '?refresh=1' : ''));
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        DB = await res.json();
+        render();
+      } catch (e) {
+        $('#status').className = 'error';
+        $('#status').textContent = '❌ 데이터 로딩 실패: ' + e.message + ' — 서버(server.js)가 실행 중인지 확인하세요.';
+      }
+    }
+
+    function render() {
+      $('#status').classList.add('hidden');
+      $('#content').classList.remove('hidden');
+      const s = DB.stats;
+      $('#genAt').textContent = '기준: ' + new Date(DB.generatedAt).toLocaleString('ko-KR');
+
+      const cards = [
+        { label: '수강 멤버', value: s.members.toLocaleString(), sub: '고유 UUID 기준' },
+        { label: '총 수강권', value: s.enrollments.toLocaleString(), sub: s.distinctCourses + '개 강의' },
+        { label: '수료 완료', value: s.completed.toLocaleString(), sub: '수료율 ' + s.completionRate + '%' },
+        { label: '평균 진도율', value: s.avgProgress + '%', sub: '전체 수강권 평균' },
+        { label: '수료증 발급', value: s.certificates.toLocaleString(), sub: '발급 완료' },
+        { label: '전체 강의 카탈로그', value: s.catalogTotal.toLocaleString(), sub: '인프런 전체' },
+      ];
+      $('#cards').innerHTML = cards.map((c) =>
+        `<div class="card"><div class="label">${c.label}</div><div class="value num">${c.value}</div><div class="sub">${c.sub}</div></div>`
+      ).join('');
+
+      const maxB = Math.max(1, ...DB.buckets.map((b) => b.count));
+      $('#buckets').innerHTML = DB.buckets.map((b) =>
+        `<div class="bar-row"><span class="name">${b.label}</span><div class="bar-track"><div class="bar-fill" style="width:${(b.count / maxB * 100).toFixed(1)}%"></div></div><span class="cnt num">${b.count}</span></div>`
+      ).join('');
+
+      const top = DB.courses.slice(0, 10);
+      const maxC = Math.max(1, ...top.map((c) => c.enrollments));
+      $('#topCourses').innerHTML = top.map((c) =>
+        `<div class="bar-row" title="${esc(c.title)}"><span class="name" style="width:auto;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)">${esc(c.title)}</span><div class="bar-track" style="max-width:120px"><div class="bar-fill" style="width:${(c.enrollments / maxC * 100).toFixed(1)}%"></div></div><span class="cnt num">${c.enrollments}</span></div>`
+      ).join('');
+
+      $('#cMembers').textContent = DB.members.length;
+      $('#cCourses').textContent = DB.courses.length;
+      $('#cEnroll').textContent = DB.enrollments.length;
+      renderTable();
+    }
+
+    const COLS = {
+      members: [
+        { key: 'uuid', label: 'UUID' },
+        { key: 'email', label: '이메일', fmt: (v) => v ? esc(v) : '<span class="muted">-</span>' },
+        { key: 'enrollments', label: '수강 강의', cls: 'num' },
+        { key: 'completed', label: '수료', cls: 'num' },
+        { key: 'avgProgress', label: '평균 진도율', cls: 'num', fmt: bar },
+        { key: 'certificates', label: '수료증', cls: 'num' },
+        { key: 'lastAccess', label: '최근 학습', fmt: (v) => v || '<span class="muted">-</span>' },
+      ],
+      courses: [
+        { key: 'courseId', label: '강의ID', cls: 'num' },
+        { key: 'title', label: '강의명', fmt: (v, r) => `<a href="https://www.inflearn.com/course/course/${r.courseId}" target="_blank">${esc(v)}</a>` },
+        { key: 'enrollments', label: '수강생', cls: 'num' },
+        { key: 'completed', label: '수료', cls: 'num' },
+        { key: 'completionRate', label: '수료율', cls: 'num', fmt: (v) => fmtPct(v) },
+        { key: 'avgProgress', label: '평균 진도율', cls: 'num', fmt: bar },
+      ],
+      enrollments: [
+        { key: 'uuid', label: 'UUID' },
+        { key: 'email', label: '이메일', fmt: (v) => v ? esc(v) : '<span class="muted">-</span>' },
+        { key: 'courseTitle', label: '강의명', fmt: (v) => esc(v) },
+        { key: 'progressRate', label: '진도율', cls: 'num', fmt: bar },
+        { key: 'status', label: '상태', fmt: (_, r) => statusPill(r) },
+        { key: 'createdAt', label: '수강신청', fmt: (v) => v || '-' },
+        { key: 'latestAccessedAt', label: '최근 학습', fmt: (v) => v || '<span class="muted">-</span>' },
+        { key: 'certificateUrl', label: '수료증', fmt: (v) => v ? `<a href="${esc(v)}" target="_blank">보기</a>` : '<span class="muted">-</span>' },
+      ],
+    };
+
+    function bar(v) {
+      const n = Number(v) || 0;
+      return `<span class="mini"><span style="width:${Math.min(100, n)}%"></span></span> <span class="num">${n.toFixed(1)}%</span>`;
+    }
+    function statusPill(r) {
+      if (r.completed) return '<span class="pill done">수료</span>';
+      if (r.progressRate > 0) return '<span class="pill prog">학습중</span>';
+      return '<span class="pill zero">미시작</span>';
+    }
+
+    function renderTable() {
+      const cols = COLS[currentTab];
+      let rows = [...DB[currentTab]];
+      const q = $('#search').value.trim().toLowerCase();
+      if (q) {
+        rows = rows.filter((r) => Object.values(r).some((v) => String(v ?? '').toLowerCase().includes(q)));
+      }
+      if (sortKey) {
+        rows.sort((a, b) => {
+          let x = a[sortKey], y = b[sortKey];
+          if (typeof x === 'number' && typeof y === 'number') return (x - y) * sortDir;
+          return String(x ?? '').localeCompare(String(y ?? '')) * sortDir;
+        });
+      }
+      $('#rowCount').textContent = rows.length.toLocaleString() + '건';
+      $('#table thead').innerHTML = '<tr>' + cols.map((c) =>
+        `<th data-key="${c.key}">${c.label}${sortKey === c.key ? (sortDir > 0 ? ' ▲' : ' ▼') : ''}</th>`
+      ).join('') + '</tr>';
+      const body = rows.slice(0, 1000).map((r) =>
+        '<tr>' + cols.map((c) => {
+          const raw = r[c.key];
+          const val = c.fmt ? c.fmt(raw, r) : (raw ?? '');
+          return `<td class="${c.cls || ''}">${val}</td>`;
+        }).join('') + '</tr>'
+      ).join('');
+      $('#table tbody').innerHTML = body || '<tr><td colspan="9" class="muted" style="text-align:center;padding:30px">결과 없음</td></tr>';
+      $('#table thead').querySelectorAll('th').forEach((th) => {
+        th.onclick = () => {
+          const k = th.dataset.key;
+          if (sortKey === k) sortDir = -sortDir; else { sortKey = k; sortDir = -1; }
+          renderTable();
+        };
+      });
+    }
+
+    $('#tabs').addEventListener('click', (e) => {
+      const t = e.target.closest('.tab'); if (!t) return;
+      currentTab = t.dataset.tab; sortKey = null; sortDir = -1;
+      $('#tabs').querySelectorAll('.tab').forEach((x) => x.classList.toggle('active', x === t));
+      renderTable();
+    });
+    $('#search').addEventListener('input', renderTable);
+    $('#refreshBtn').addEventListener('click', () => load(true));
+    load(false);
+  </script>
+</body>
+</html>
