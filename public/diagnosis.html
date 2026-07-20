@@ -122,9 +122,16 @@
     h1{font-size:25px}
   }
   @media(prefers-reduced-motion:reduce){.fill{transition:none}}
+  .skip-btn{position:fixed;top:16px;right:20px;z-index:50;font-size:13px;font-weight:700;color:#5f676f;background:#fff;border:1px solid #d6dbe2;border-radius:999px;padding:9px 16px;text-decoration:none;box-shadow:0 2px 10px rgba(20,30,60,.08)}
+  .skip-btn:hover{border-color:#00c471;color:#00a05d;background:#f0fdf7}
 </style>
 </head>
 <body>
+<script>
+// 로그인 세션 확인 — 세션이 없으면 홈(/#/)이 로그인으로 튕기므로, 회원가입(온보딩 튜토리얼)부터 진행
+fetch('/api/auth/me').then((r) => { if (!r.ok) location.replace('/onboarding'); }).catch(() => {});
+</script>
+<a class="skip-btn" href="/#/" title="진단하지 않고 홈으로 이동 (추천 데이터는 비어 있음)">건너뛰기 → 홈으로</a>
 <div class="wrap">
   <header class="top">
     <div class="eyebrow">사내 교육 · 프로토타입</div>

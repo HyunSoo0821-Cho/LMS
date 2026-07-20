@@ -118,8 +118,9 @@ window.delNotice2 = async (i) => {
 
 // ---------- 역량진단 결과 + 맞춤 추천 (관리자 rec-config 기반) ----------
 function getDiagnosis() {
-  if (state.user?.assessment) return state.user.assessment;
-  try { return JSON.parse(localStorage.getItem('lms_diagnosis') || 'null'); } catch { return null; }
+  // 진단 결과는 로그인 계정(assessment) 기준으로만 판단.
+  // localStorage 폴백을 쓰면 같은 브라우저의 다른 계정/예전 결과가 새 계정에 노출되므로 사용하지 않음.
+  return state.user?.assessment || null;
 }
 // 약점 역량의 태그 가중치 맵 (검색 스코어 부스트에 사용)
 function weakTagWeights() {
@@ -185,9 +186,55 @@ function recommendCourses() {
 function recBannerHtml() {
   const rec = recommendCourses(); const diag = getDiagnosis();
   if (!diag) {
-    return `<div class="rec-banner empty"><div class="rb-head">✨ AI 역량진단을 아직 하지 않으셨어요</div>
-      <div class="rb-sub">진단을 완료하면 약점 역량·난이도에 맞는 강의를 여기서 추천해 드립니다.</div>
-      <a class="mini-btn" href="/diagnosis">🧭 역량진단 하러 가기</a></div>`;
+    // 역량진단 미완료 → 추천강좌 자리에 광고형 진단 배너 (좌우 장식 일러스트 + 중앙 카피 + CTA)
+    return `<div class="rec-ad">
+      <div class="rec-ad-head"><h2 class="rec-ad-title">추천강좌</h2></div>
+      <a class="diag-ad" href="/diagnosis">
+        <svg class="da-deco da-l" viewBox="0 0 220 130" aria-hidden="true">
+          <circle cx="30" cy="24" r="3.5" fill="#FFE14D"/>
+          <circle cx="196" cy="18" r="2.5" fill="#fff" opacity=".7"/>
+          <path d="M14 96 l7 -18 7 18 -7 -6z" fill="#7DD3FC" opacity=".9" transform="rotate(-18 21 88)"/>
+          <g transform="translate(120,66) rotate(-8)">
+            <rect x="-34" y="-24" width="68" height="48" rx="7" fill="#fff" opacity=".14"/>
+            <rect x="-24" y="4" width="9" height="12" rx="2" fill="#7DD3FC"/>
+            <rect x="-10" y="-4" width="9" height="20" rx="2" fill="#FFE14D"/>
+            <rect x="4" y="-14" width="9" height="30" rx="2" fill="#6EE7B7"/>
+            <path d="M-22 -8 L-6 -14 L10 -22" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+            <circle cx="10" cy="-22" r="3.4" fill="#fff"/>
+          </g>
+          <g transform="translate(48,42)">
+            <circle r="17" fill="none" stroke="#fff" stroke-width="2.2" opacity=".85"/>
+            <path d="M-6 -1 a6 7 0 1 1 12 0 c0 4 -6 4 -6 8" stroke="#FFE14D" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+            <circle cx="0" cy="12" r="1.8" fill="#FFE14D"/>
+          </g>
+          <path d="M170 104 h26 M183 91 v26" stroke="#fff" stroke-width="2.6" opacity=".55" stroke-linecap="round"/>
+        </svg>
+        <svg class="da-deco da-r" viewBox="0 0 220 130" aria-hidden="true">
+          <circle cx="196" cy="26" r="3.5" fill="#FFE14D"/>
+          <circle cx="20" cy="104" r="2.5" fill="#fff" opacity=".7"/>
+          <g transform="translate(70,64) rotate(7)">
+            <path d="M-26 -12 a26 26 0 0 1 52 0 v6 a26 22 0 0 1 -52 0 z" fill="#fff" opacity=".14"/>
+            <path d="M-14 -14 h28 M-18 -4 h36 M-14 6 h28" stroke="#7DD3FC" stroke-width="2.6" stroke-linecap="round"/>
+            <circle cx="-14" cy="-14" r="2.4" fill="#FFE14D"/><circle cx="14" cy="-14" r="2.4" fill="#FFE14D"/>
+            <circle cx="-18" cy="-4" r="2.4" fill="#6EE7B7"/><circle cx="18" cy="-4" r="2.4" fill="#6EE7B7"/>
+          </g>
+          <g transform="translate(158,52) rotate(12)">
+            <path d="M-24 0 L0 -12 L24 0 L0 12 Z" fill="#FFE14D"/>
+            <path d="M-24 0 L0 -12 L24 0 L0 12 Z" fill="#fff" opacity=".25"/>
+            <path d="M0 12 v14 M14 6 v16" stroke="#FFE14D" stroke-width="2.6" stroke-linecap="round"/>
+            <circle cx="14" cy="24" r="2.6" fill="#FFE14D"/>
+          </g>
+          <g font-weight="800" font-size="13" fill="#fff" opacity=".85">
+            <text x="120" y="112">E</text><text x="138" y="104">V</text><text x="156" y="112">O</text><text x="174" y="104">F</text>
+          </g>
+        </svg>
+        <img class="da-mascot" src="/mascot.png" alt="" onerror="this.style.display='none'" />
+        <div class="da-center">
+          <div class="da-title"><span class="da-hl">[5분 완성]</span> AI 역량진단 하고 <b>맞춤 강의</b> 추천받기</div>
+          <div class="da-cta">진단 완료 시 <b>약점 보완 강의</b> 바로 추천 · 역량진단 받기 <span class="da-arr">›</span></div>
+        </div>
+      </a>
+    </div>`;
   }
   if (!rec || !rec.items.length) {
     return `<div class="rec-banner"><div class="rb-head">🎉 ${esc(state.user?.name || '')}님, 약점 역량이 없습니다 (레벨 ${esc(diag.level)})</div>
@@ -195,20 +242,16 @@ function recBannerHtml() {
   }
   const cards = rec.items.map((it) => {
     const c = state.courseById.get(it.id);
-    const compName = state.recConfig?.comps?.[it.comp] || it.comp;
-    return `<div class="rb-card" onclick="go('#/course/${it.id}')">
-      <img loading="lazy" src="${esc(c?.thumbnailUrl || '')}" onerror="this.style.opacity=0">
-      <div class="rb-body">
-        <span class="rb-tag">${esc(it.comp)} ${esc(compName)} · ${esc(it.lv)}</span>
-        <div class="rb-title">${esc(c?.title || it.title)}</div>
-        <div class="rb-why">${esc(it.why)}${it.indirect ? ' · 간접' : ''}</div>
-      </div></div>`;
+    return `<div class="rb-tile" onclick="go('#/course/${it.id}')" title="${esc(c?.title || it.title)}">
+      <img loading="lazy" src="${esc(c?.thumbnailUrl || '')}" alt="${esc(c?.title || it.title)}" onerror="this.style.opacity=.15">
+    </div>`;
   }).join('');
-  return `<div class="rec-banner">
-    <div class="rb-head">✨ ${esc(state.user?.name || '')}님 역량진단 맞춤 추천 <span class="rb-lv">레벨 ${esc(rec.level)} · 약점 ${(getDiagnosis().weak || []).join('·') || '없음'}</span>
-      <a class="rb-redo" href="/diagnosis">진단 다시 하기 ↻</a></div>
+  return `<div class="rec-ad">
+    <div class="rec-ad-head">
+      <h2 class="rec-ad-title">추천강좌</h2>
+      <a class="rec-ad-redo" href="/diagnosis">진단 다시 하기 ↻</a>
+    </div>
     <div class="rb-rail">${cards}</div>
-    ${rec.notes.length ? `<div class="rb-notes">${rec.notes.map((n) => `<div>· ${esc(n)}</div>`).join('')}</div>` : ''}
   </div>`;
 }
 
@@ -1363,15 +1406,39 @@ function renderMy() {
       </div>
     </div>
     ${myDash.view === 'dash' ? dashHtml(enr) : dashListHtml(enr)}
+    <div id="ccUserSec"></div>
+    <div id="ilMerged"></div>
   </div>`;
   if (myDash.view === 'dash') bindDashChart();
+  renderMyExtras(); // 사내 개설 과정 + 개별학습 섹션 (비동기 로드)
+}
+
+// ---- 내 학습 하단 통합 섹션: 사내 개설 과정 + 개별학습 ----
+async function renderMyExtras() {
+  if (!state.customCourses) {
+    try {
+      const cc = await fetch('/api/custom-courses').then((r) => r.json());
+      state.customCourses = cc.courses || [];
+    } catch { state.customCourses = []; }
+  }
+  drawCcSection();
+  await loadIlRecords();
+  drawIllearn();
+}
+async function reloadCc() {
+  state.customCourses = null;
+  try {
+    const cc = await fetch('/api/custom-courses').then((r) => r.json());
+    state.customCourses = cc.courses || [];
+  } catch { state.customCourses = []; }
+  drawCcSection();
 }
 
 // ---- 대시보드 본문 ----
 function dashHtml(enr) {
   if (!enr.length) {
     return `<div class="empty-box">아직 수강 중인 강의가 없어요.<br><br>
-      <button class="mini-btn" onclick="go('#/apply')">수강신청 하러 가기 →</button></div>`;
+      <button class="mini-btn" onclick="go('#/courses')">강의 보러 가기 →</button></div>`;
   }
   const s = myStats(enr);
   const totalSec = enr.reduce((a, e) => a + (e.runtime || 0) * (e.progressRate / 100), 0);
@@ -1617,24 +1684,17 @@ async function loadIlRecords() {
   } catch { ilView.records = []; }
 }
 
-async function renderIllearn() {
-  setNav('illearn');
-  app().innerHTML = `<div class="wrap"><div class="loading-screen"><div class="spinner"></div>개별학습 내역을 불러오는 중…</div></div>`;
-  await loadIlRecords();
-  drawIllearn();
-}
-
+// 내 학습 페이지 하단의 "개별학습" 섹션 렌더 (#ilMerged)
 function drawIllearn() {
+  const box = $('#ilMerged');
+  if (!box) return;
   const recs = ilView.records;
   const learning = recs.filter((r) => !ilDone(r)).length;
   const done = recs.filter(ilDone).length;
-  app().innerHTML = `<div class="wrap">
-    <div class="il-hero">
-      <div>
-        <h1>개별학습 <span class="il-hero-sub">사외교육 · 자격증 · 학위</span></h1>
-        <p>사외 학습을 <b>등록</b>하고 학습률을 갱신하세요. <b>학습률 100% 달성 시 수료증</b>을 발급받을 수 있습니다.</p>
-      </div>
-      <button class="mini-btn" style="margin-top:0" onclick="toggleIlForm()">${ilView.form ? '✕ 등록 폼 닫기' : '＋ 개별학습 등록'}</button>
+  box.innerHTML = `
+    <div class="section-head" style="margin-top:38px">
+      <h2 style="font-size:18px">개별학습 <span class="muted" style="font-size:13px;font-weight:500">사외교육·자격증·학위 — 등록 후 학습률 <b>100%</b> 달성 시 수료증 발급</span></h2>
+      <button class="mini-btn" id="ilFormBtn" style="margin:0" onclick="toggleIlForm()">${ilView.form ? '✕ 등록 폼 닫기' : '＋ 개별학습 등록'}</button>
     </div>
     <div class="il-stat-row">
       <div class="il-stat"><div class="k">전체 등록</div><div class="v num">${recs.length}</div></div>
@@ -1642,10 +1702,9 @@ function drawIllearn() {
       <div class="il-stat"><div class="k">이수 완료 (수료증)</div><div class="v num">${done}</div></div>
     </div>
     <div id="ilFormBox">${ilView.form ? ilFormHtml() : ''}</div>
-    <div class="section-head" style="margin:26px 0 14px"><h2 style="font-size:18px">내 개별학습 목록</h2></div>
-    ${recs.length ? `<div class="il-list">${recs.map(ilCardHtml).join('')}</div>`
+    ${recs.length ? `<div class="il-list" style="margin-top:16px">${recs.map(ilCardHtml).join('')}</div>`
       : '<div class="empty-box">아직 등록한 개별학습이 없어요.<br>사외교육·자격증·학위를 <b>등록</b>해 보세요.</div>'}
-  </div>`;
+  `;
 }
 
 function ilFormHtml() {
@@ -1695,6 +1754,8 @@ function ilCardHtml(r) {
   return `<div class="il-card">
     <div class="il-card-top">
       <span class="il-type">${esc(r.ltype)}</span>
+      ${r.category ? `<span class="il-tag">${esc(r.category)}</span>` : ''}
+      ${r.org ? `<span class="il-tag org">${esc(r.org)}</span>` : ''}
       <span class="il-badge ${st.cls}">${st.t}</span>
       <span class="il-date muted">등록 ${esc((r.requestedAt || '').slice(0, 10))}</span>
     </div>
@@ -1727,7 +1788,7 @@ window.toggleIlForm = () => {
   const box = $('#ilFormBox');
   if (box) box.innerHTML = ilView.form ? ilFormHtml() : '';
   // 버튼 라벨 갱신
-  const btn = document.querySelector('.il-hero .mini-btn');
+  const btn = $('#ilFormBtn');
   if (btn) btn.textContent = ilView.form ? '✕ 등록 폼 닫기' : '＋ 개별학습 등록';
   if (ilView.form && box) box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 };
@@ -1868,10 +1929,10 @@ function route() {
   if (parts[0] === 'learn' && parts[1]) return renderPlayer(parts[1]);
   if (parts[0] === 'courses') return renderCourses(params);
   if (parts[0] === 'search') { go('#/'); return; } // 검색 페이지 제거 → 홈(추천 배너)으로
-  if (parts[0] === 'apply') return renderApply();
+  if (parts[0] === 'apply') { go('#/my'); return; } // 수강신청 페이지 제거 → 내 학습(통합)으로
   if (parts[0] === 'recommend') return renderRecommend();
   if (parts[0] === 'my') return renderMy();
-  if (parts[0] === 'illearn') return renderIllearn();
+  if (parts[0] === 'illearn') { go('#/my'); return; } // 개별학습은 내 학습 페이지에 통합
   if (parts[0] === 'mypage') return renderMypage();
   if (parts[0] === 'onboarding') { location.href = '/onboarding'; return; }
   return renderHome();
@@ -1930,82 +1991,18 @@ function initSearchSuggest() {
   }
 }
 
-// ================= 수강 신청 =================
-const applyView = { q: '', selected: null, result: null };
-function renderApply() {
-  setNav('apply');
-  drawApply();
-}
-function drawApply() {
-  const sel = applyView.selected ? state.courseById.get(applyView.selected) : null;
-  const matches = applyView.q
-    ? state.catalog.courses.filter((c) => c.title.toLowerCase().includes(applyView.q.toLowerCase())).slice(0, 8) : [];
-  app().innerHTML = `<div class="wrap">
-    <div class="section-head" style="margin-top:26px"><h2>수강 신청</h2></div>
-    <div class="apply-grid">
-      <div class="apply-card">
-        <h3>① 강의 선택 & 수강 가능여부 확인</h3>
-        <input class="apply-input" placeholder="강의명으로 검색 (예: 쿠버네티스, RAG)" value="${esc(applyView.q)}"
-          oninput="applyView.q=this.value;applyView.selected=null;drawApply();document.querySelector('.apply-input').focus();document.querySelector('.apply-input').setSelectionRange(this.value.length,this.value.length)">
-        ${matches.length && !sel ? `<div class="apply-matches">${matches.map((c) => `<div onclick="applyView.selected=${c.id};applyView.q=${JSON.stringify(c.title).replace(/"/g, '&quot;')};drawApply()">${esc(c.title)} <small>${esc(c.level || '')}</small></div>`).join('')}</div>` : ''}
-        ${sel ? `<div class="apply-sel">
-            <img src="${esc(sel.thumbnailUrl || '')}" onerror="this.style.opacity=0">
-            <div><b>${esc(sel.title)}</b><div class="muted" style="font-size:12px">${esc(sel.instructorName || '')} · ${esc(sel.level || '')} · ${priceLabel(sel.regularPrice)}</div></div>
-          </div>
-          <button class="mini-btn" onclick="checkEnroll(${sel.id})">수강 가능여부 확인</button>` : '<div class="muted" style="font-size:13px;margin-top:8px">강의를 검색해 선택하세요.</div>'}
-        <div id="applyResult">${applyView.result || ''}</div>
-      </div>
-      <div class="apply-card">
-        <h3>② 수강신청 (수강권 발급)</h3>
-        <label class="apply-lb">수강 기간 (만료일 설정)</label>
-        <select id="applyMonths" class="apply-input"><option value="3">3개월</option><option value="6" selected>6개월</option><option value="12">12개월</option></select>
-        <label class="apply-lb">승인 방식</label>
-        <select id="applyApprove" class="apply-input"><option value="auto" selected>자동승인</option><option value="manual">관리자 승인 후 수강</option></select>
-        <button class="mini-btn" style="margin-top:12px" onclick="applyEnroll()">수강신청 하기</button>
-        <div class="muted" style="font-size:12px;margin-top:10px">신청 내역은 [내 학습 → 내 수강권 목록]에서 확인합니다.</div>
-      </div>
-      <div class="apply-card">
-        <h3>③ 수강코드 등록</h3>
-        <div class="muted" style="font-size:13px;margin-bottom:8px">관리자에게 받은 수강코드가 있다면 등록하세요.</div>
-        <input id="applyCode" class="apply-input" placeholder="예: EST-2026-XXXX">
-        <button class="mini-btn" style="margin-top:10px" onclick="registerCode()">코드 등록</button>
-      </div>
-    </div>
-    <div id="ccUserSec"></div>
-    <div id="apprUserSec"></div>
-  </div>`;
-  drawApplyExtras();
-  loadApplyExtras();
-}
-
-// ---- 사내 개설 과정 + 개별학습(사외교육) 요약 ----
-async function loadApplyExtras() {
-  if (state.customCourses && state.myIl) return;
-  try {
-    const [cc, il] = await Promise.all([
-      fetch('/api/custom-courses').then((r) => r.json()),
-      fetch('/api/individual-learning').then((r) => r.json()),
-    ]);
-    state.customCourses = cc.courses || [];
-    state.myIl = il.records || [];
-    drawApplyExtras();
-  } catch { /* 서버 미지원 시 섹션 생략 */ }
-}
-async function reloadApplyExtras() {
-  state.customCourses = null; state.myIl = null;
-  await loadApplyExtras();
-}
+// ================= (수강신청 페이지 제거 — 사내 개설 과정·개별학습은 내 학습 페이지에 통합) =================
 
 const upill = (s) => `<span class="upill ${s === '승인' || s === '수료' ? 'ok' : s === '반려' ? 'bad' : s === '취소' ? 'zero' : 'warn'}">${s}</span>`;
 
-function drawApplyExtras() {
-  const ccSec = $('#ccUserSec'), apSec = $('#apprUserSec');
-  if (!ccSec || !apSec) return;
-
-  // ① 사내 개설 과정 (운영중 과정 — 신청형은 즉시 입과, 선발형은 승인 후 입과)
+// ---- 사내 개설 과정 섹션 (내 학습 페이지 #ccUserSec) ----
+function drawCcSection() {
+  const ccSec = $('#ccUserSec');
+  if (!ccSec) return;
+  // 운영중 과정 — 신청형은 즉시 입과, 선발형은 승인 후 입과
   const list = (state.customCourses || []).filter((c) => c.status === '운영중');
   ccSec.innerHTML = list.length ? `
-    <div class="section-head" style="margin-top:38px"><h2>사내 개설 과정 <span class="muted" style="font-size:13px">교육담당자가 개설한 자체 교육과정</span></h2></div>
+    <div class="section-head" style="margin-top:38px"><h2 style="font-size:18px">사내 개설 과정 <span class="muted" style="font-size:13px;font-weight:500">교육담당자가 개설한 자체 교육과정</span></h2></div>
     <div class="ccu-grid">${list.map((c) => {
       const resSum = {};
       (c.resources || []).forEach((r) => { resSum[r.type] = (resSum[r.type] || 0) + 1; });
@@ -2024,37 +2021,6 @@ function drawApplyExtras() {
         <div class="ccu-foot">${action}<span class="muted" style="font-size:11.5px">수강 ${c.learnerCount}명 · 수료 ${c.completedCount}명</span></div>
       </div>`;
     }).join('')}</div>` : '';
-
-  // ② 개별학습 (사외교육·자격증·학위) — 등록 → 학습률 100% → 수료증 발급
-  const ilRecs = state.myIl || [];
-  const ilLearning = ilRecs.filter((r) => !ilDone(r));
-  const ilCompleted = ilRecs.filter(ilDone);
-  apSec.innerHTML = `
-    <div class="section-head" style="margin-top:38px"><h2>개별학습 <span class="muted" style="font-size:13px">사외교육·자격증·학위 — 등록 후 학습률 100% 달성 시 수료증 발급</span></h2></div>
-    <div class="apply-grid" style="grid-template-columns:1fr 1.5fr">
-      <div class="apply-card">
-        <h3>개별학습 등록</h3>
-        <div class="muted" style="font-size:12.5px;margin-bottom:10px">사전신청·승인 절차 없이 바로 등록하고 학습을 시작하세요. 학습률 100%가 되면 수료증을 발급받을 수 있습니다.</div>
-        <div style="display:flex;gap:10px;margin:14px 0">
-          <div style="flex:1;text-align:center;background:#f7f9fb;border:1px solid #e4e8ee;border-radius:10px;padding:12px 6px"><div class="muted" style="font-size:11.5px">전체 등록</div><b style="font-size:20px">${ilRecs.length}</b></div>
-          <div style="flex:1;text-align:center;background:#f7f9fb;border:1px solid #e4e8ee;border-radius:10px;padding:12px 6px"><div class="muted" style="font-size:11.5px">학습중</div><b style="font-size:20px">${ilLearning.length}</b></div>
-          <div style="flex:1;text-align:center;background:#f7f9fb;border:1px solid #e4e8ee;border-radius:10px;padding:12px 6px"><div class="muted" style="font-size:11.5px">수료증</div><b style="font-size:20px">${ilCompleted.length}</b></div>
-        </div>
-        <button class="mini-btn" style="width:100%" onclick="go('#/illearn')">＋ 개별학습 등록·관리 바로가기</button>
-      </div>
-      <div class="apply-card">
-        <h3>내 개별학습 현황</h3>
-        ${ilRecs.length ? `<table class="appr-table"><thead><tr><th>교육명</th><th>기간</th><th>학습률</th><th>수료증</th></tr></thead><tbody>
-          ${ilRecs.slice(0, 6).map((r) => `<tr>
-              <td><b>${esc(r.title)}</b><div class="muted" style="font-size:11px">${esc(r.ltype)}${r.org ? ' · ' + esc(r.org) : ''}</div></td>
-              <td class="num" style="white-space:nowrap;font-size:11.5px">${esc((r.startDate || '-').slice(0, 10))}<br>~ ${esc((r.endDate || '-').slice(0, 10))}</td>
-              <td class="num" style="white-space:nowrap">${ilProg(r)}%</td>
-              <td>${ilDone(r) ? '<span class="upill ok">🏅 발급</span>' : ilProg(r) >= 100 ? '<span class="upill warn">발급 가능</span>' : '<span class="muted">-</span>'}</td>
-            </tr>`).join('')}
-        </tbody></table>` : '<div class="muted" style="font-size:13px;padding:20px 0;text-align:center">등록된 개별학습이 없습니다.<br>사외교육·자격증·학위를 등록해 보세요.</div>'}
-        <div class="muted" style="font-size:11.5px;margin-top:10px">💡 학습률 100% 달성 시 <b>개별학습</b> 메뉴에서 수료증을 발급·인쇄할 수 있습니다.</div>
-      </div>
-    </div>`;
 }
 
 window.ccApply = async (courseId) => {
@@ -2063,7 +2029,7 @@ window.ccApply = async (courseId) => {
     const j = await r.json();
     if (!r.ok) { toast('신청 실패: ' + (j.error || r.status)); return; }
     toast(j.status === '신청대기' ? '신청 완료! 선발 승인 후 입과됩니다 📋' : '수강신청 완료! 바로 학습을 시작하세요 🎉');
-    await reloadApplyExtras();
+    await reloadCc();
   } catch (e) { toast('신청 실패: ' + e.message); }
 };
 window.ccuProgress = async (courseId, cur) => {
@@ -2072,44 +2038,10 @@ window.ccuProgress = async (courseId, cur) => {
     const j = await r.json();
     if (!r.ok) { toast(j.error || '진도 반영 실패'); return; }
     toast(j.learner.status === '수료' ? '🎓 수료 완료! 수료증이 발급되었습니다' : `진도 ${j.learner.progress}% 반영되었습니다`);
-    await reloadApplyExtras();
+    await reloadCc();
   } catch (e) { toast('진도 반영 실패: ' + e.message); }
 };
 // (사전신청/결과보고 플로우 제거 — 개별학습은 등록 → 학습률 100% → 수료증 발급으로 단순화)
-window.checkEnroll = async (courseId) => {
-  const uuid = state.user?.uuid || 'es12';
-  applyView.result = '<div class="muted" style="margin-top:10px">확인 중…</div>'; $('#applyResult').innerHTML = applyView.result;
-  try {
-    const r = await fetch(`/api/check-enrollment?uuid=${encodeURIComponent(uuid)}&courseId=${courseId}`).then((x) => x.json());
-    const ok = r.code === 'SUCCESS';
-    const detail = r.data ? Object.entries(r.data).map(([k, v]) => `${esc(k)}: ${esc(JSON.stringify(v))}`).join(' · ') : esc(r.message || '');
-    applyView.result = `<div class="apply-res ${ok ? 'ok' : 'no'}">${ok ? '✅ 조회 성공' : '⚠ ' + esc(r.message || '조회 실패')}${detail ? `<div class="muted" style="font-size:12px;margin-top:4px">${detail}</div>` : ''}</div>`;
-  } catch (e) { applyView.result = `<div class="apply-res no">⚠ ${esc(e.message)}</div>`; }
-  drawApply();
-};
-window.applyEnroll = async () => {
-  if (!applyView.selected) { toast('먼저 강의를 선택하세요'); return; }
-  const c = state.courseById.get(applyView.selected);
-  const existing = requestForCourse(applyView.selected);
-  if (existing && existing.status === 'pending') { toast('이미 승인 대기 중인 신청이 있어요'); return; }
-  if (existing && existing.status === 'approved' || alreadyEnrolled(applyView.selected)) { toast('이미 수강 중인 강의예요'); go('#/my'); return; }
-  try {
-    const r = await fetch('/api/enrollments', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ courseId: applyView.selected, courseTitle: c?.title, thumbnailUrl: c?.thumbnailUrl }),
-    });
-    const j = await r.json();
-    if (!r.ok) { toast('신청 실패: ' + (j.error || r.status)); return; }
-    state.myRequests = [j.request, ...(state.myRequests || []).filter((x) => String(x.courseId) !== String(applyView.selected))];
-    toast('수강신청이 접수되었습니다. 관리자 승인 후 학습을 시작할 수 있어요 ⏳');
-  } catch (e) { toast('신청 실패: ' + e.message); }
-};
-window.registerCode = () => {
-  const v = $('#applyCode').value.trim();
-  if (!v) { toast('수강코드를 입력하세요'); return; }
-  toast(`수강코드 [${v}] 등록 완료 (데모)`);
-};
-
 // ================= 추천강좌 (역량진단 맞춤) =================
 function renderRecommend() {
   setNav('recommend');
@@ -2134,7 +2066,7 @@ function renderRecommend() {
         <div class="rcm-title">${esc(c?.title || it.title)}</div>
         <div class="rcm-why">💡 ${esc(it.why)}${it.indirect ? ' · 간접' : ''}</div>
         ${c ? `<div class="rcm-meta"><span>${esc(c.instructorName || '')}</span><span>★ ${(c.rating || 0).toFixed(1)}</span><span>${(c.studentCount || 0).toLocaleString()}명</span></div>` : ''}
-        <button class="mini-btn" style="margin-top:10px" onclick="event.stopPropagation();go('#/apply')">수강신청 →</button>
+        <button class="mini-btn" style="margin-top:10px" onclick="event.stopPropagation();go('#/course/${it.id}')">수강신청 →</button>
       </div></div>`;
   }).join('');
   app().innerHTML = `<div class="wrap">
@@ -2318,6 +2250,8 @@ textarea.il-input{resize:vertical}
 .il-card:hover{box-shadow:0 4px 16px rgba(20,30,60,.06)}
 .il-card-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px}
 .il-type{font-size:11px;font-weight:800;color:#2b6ef2;background:#e3edff;border-radius:6px;padding:3px 9px}
+.il-tag{font-size:11px;font-weight:800;color:#0b7a53;background:#e6f9f0;border-radius:6px;padding:3px 9px}
+.il-tag.org{color:#5f676f;background:#f1f4f9}
 .il-badge{font-size:11px;font-weight:800;border-radius:999px;padding:3px 10px}
 .il-badge.wait{background:#fff4e5;color:#d98800}
 .il-badge.ok{background:#e3edff;color:#1b56cf}
@@ -2334,23 +2268,41 @@ textarea.il-input{resize:vertical}
 .il-result{margin-top:12px;background:#f7f9fb;border:1px solid #e7e9ee;border-radius:10px;padding:12px 14px;font-size:13.5px;color:#40454d;line-height:1.7}
 .il-result b{display:block;font-size:12px;color:#8b93a1;margin-bottom:4px}
 .il-card-actions{display:flex;gap:8px;margin-top:14px}
-.rec-banner{background:linear-gradient(120deg,#eafff4,#f0f7ff);border:1px solid #cdeede;border-radius:14px;padding:18px 20px;margin:18px 0}
-.rec-banner.empty{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
-.rb-head{font-size:16px;font-weight:800;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.rb-lv{font-size:12px;font-weight:700;color:#00a05d;background:#dcf9ec;border-radius:999px;padding:3px 10px}
-.rb-redo{margin-left:auto;font-size:12px;color:#5f676f;text-decoration:none}
+.rec-banner{background:#fff;border:1px solid #e7e9ee;border-radius:16px;padding:18px 20px 10px;margin:18px 0;box-shadow:0 2px 12px rgba(20,30,60,.05)}
+.rec-banner.empty{display:flex;flex-direction:column;gap:8px;align-items:flex-start;background:#f7f9fb}
+.rb-head{font-size:16px;font-weight:800;display:flex;align-items:center;gap:10px;flex-wrap:wrap;color:#1a1c1f}
+.rb-lv{font-size:12px;font-weight:700;color:#2b6ef2;background:#eef4ff;border-radius:999px;padding:3px 10px}
+.rb-redo{margin-left:auto;font-size:12px;color:#8b93a1;text-decoration:none;font-weight:600}
+.rb-redo:hover{color:#2b6ef2}
 .rb-sub{font-size:13px;color:#5f676f}
-.rb-rail{display:flex;gap:12px;overflow-x:auto;padding:12px 2px 4px}
-.rb-card{flex:0 0 250px;background:#fff;border:1px solid #e4e8ee;border-radius:12px;overflow:hidden;cursor:pointer}
-.rb-card img{width:100%;height:98px;object-fit:cover;display:block;background:#eef1f5}
-.rb-body{padding:10px 12px}
-.rb-tag{font-size:11px;font-weight:700;color:#00a05d;background:#eafff4;border-radius:6px;padding:2px 7px}
-.rb-title{font-size:13px;font-weight:700;margin:7px 0 4px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.rb-why{font-size:11.5px;color:#8b93a1}
-.rb-notes{font-size:12px;color:#7d8590;margin-top:8px;line-height:1.7}
+.rec-ad{margin:22px 0}
+.rec-ad-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 12px}
+.rec-ad-title{font-size:20px;font-weight:800;letter-spacing:-.4px;color:#1a1c1f;margin:0}
+.rec-ad-redo{font-size:13px;font-weight:600;color:#6b7280;text-decoration:none;background:none;border:none;padding:0;white-space:nowrap}
+.rec-ad-redo:hover{color:#2b6ef2}
+/* 광고형 역량진단 배너 (진단 미완료 시 추천강좌 자리) */
+.diag-ad{position:relative;display:flex;align-items:center;justify-content:center;min-height:128px;border-radius:14px;overflow:hidden;cursor:pointer;text-decoration:none;
+  background:linear-gradient(105deg,#1B64DA 0%,#4338CA 45%,#6D28D9 75%,#2563EB 100%);box-shadow:0 10px 26px rgba(43,56,202,.25);transition:transform .15s ease,box-shadow .15s ease}
+.diag-ad:hover{transform:translateY(-2px);box-shadow:0 14px 32px rgba(43,56,202,.32);text-decoration:none}
+.da-deco{position:absolute;top:0;height:100%;width:220px;pointer-events:none}
+.da-l{left:0}.da-r{right:0}
+.da-mascot{position:absolute;left:150px;bottom:-6px;width:76px;height:auto;filter:drop-shadow(0 6px 10px rgba(0,0,0,.25));pointer-events:none}
+.da-center{position:relative;text-align:center;padding:20px 230px;z-index:1}
+.da-title{color:#fff;font-size:23px;font-weight:800;letter-spacing:-.4px;text-shadow:0 2px 8px rgba(0,0,0,.18);white-space:nowrap}
+.da-title b{color:#FFE14D}
+.da-hl{color:#7DF3C2}
+.da-cta{display:inline-block;margin-top:11px;background:#fff;color:#1B64DA;font-size:13.5px;font-weight:700;padding:8px 18px;border-radius:999px;box-shadow:0 4px 12px rgba(0,0,0,.18)}
+.da-cta b{color:#6D28D9}
+.da-arr{font-weight:800}
+@media (max-width:980px){.da-deco,.da-mascot{display:none}.da-center{padding:20px 22px}.da-title{white-space:normal;font-size:19px}}
+.rb-rail{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:3px}
+.rb-tile{position:relative;overflow:hidden;aspect-ratio:16/10;background:#eef1f5;cursor:pointer;border-radius:4px;transition:transform .16s ease,box-shadow .16s ease}
+.rb-tile img{width:100%;height:100%;object-fit:cover;display:block}
+.rb-tile:hover{transform:scale(1.05);box-shadow:0 10px 26px rgba(20,30,60,.28);z-index:2}
+@media (max-width:640px){.rb-rail{grid-template-columns:repeat(3,1fr)}}
 .quick-chip.comp{border-color:#bfe9d6;background:#f4fdf9;color:#00794b;font-weight:700}
 .quick-chip.comp.on{background:#00c471;border-color:#00c471;color:#fff}
-.rec-hero{background:linear-gradient(120deg,#eafff4,#f0f7ff);border:1px solid #cdeede;border-radius:16px;padding:26px 28px;margin-top:22px}
+.rec-hero{background:linear-gradient(120deg,#eef4ff,#f7f9fb);border:1px solid #dbe4f0;border-radius:16px;padding:26px 28px;margin-top:22px}
 .rec-hero h1{margin:0 0 10px;font-size:22px}
 .rec-hero p{color:#5f676f;font-size:14px;margin:0 0 14px}
 .rec-chips{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px}

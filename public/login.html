@@ -38,6 +38,28 @@
     .demo-mail { font-size: 12.5px; font-weight: 700; color: #333; white-space: nowrap; }
     .demo-note { font-size: 11px; color: #9aa2ad; margin-left: auto; white-space: nowrap; }
     @media (max-width: 420px) { .demo-note { display: none; } }
+    .start-box { margin-top: 18px; text-align: center; font-size: 13px; color: #7d8590; }
+    .start-box .start-link { display: inline-block; margin-top: 6px; color: #00a05d; font-weight: 800; text-decoration: none; }
+    .start-box .start-link:hover { text-decoration: underline; }
+    .ms-btn { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; box-sizing: border-box; border: 1.5px solid #d6dbe2; border-radius: 8px; padding: 12px 0; font-size: 14.5px; font-weight: 700; color: #2f2f2f; background: #fff; text-decoration: none; cursor: pointer; }
+    .ms-btn:hover { border-color: #5b5fc7; background: #f6f7ff; }
+    .ms-logo { display: inline-grid; grid-template-columns: 9px 9px; grid-template-rows: 9px 9px; gap: 2px; }
+    .ms-logo i { width: 9px; height: 9px; display: block; }
+    .ms-logo i:nth-child(1) { background: #f25022; } .ms-logo i:nth-child(2) { background: #7fba00; }
+    .ms-logo i:nth-child(3) { background: #00a4ef; } .ms-logo i:nth-child(4) { background: #ffb900; }
+    .or-div { display: flex; align-items: center; gap: 12px; margin: 16px 0; color: #9aa2ad; font-size: 12px; }
+    .or-div::before, .or-div::after { content: ''; flex: 1; height: 1px; background: #e4e8ee; }
+    .sso-demo-note { font-size: 11.5px; color: #a86300; background: #fff7e6; border: 1px solid #ffe0a3; border-radius: 7px; padding: 6px 10px; margin-top: 8px; text-align: center; }
+    .ms-demo-ov { position: fixed; inset: 0; background: rgba(15,23,42,.5); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 500; }
+    .ms-demo-ov.show { display: flex; }
+    .ms-demo-card { width: 100%; max-width: 400px; background: #fff; border-radius: 14px; box-shadow: 0 20px 60px rgba(15,23,42,.3); padding: 24px 24px 22px; }
+    .ms-demo-head { display: flex; align-items: center; gap: 9px; font-size: 16px; margin-bottom: 6px; }
+    .ms-demo-tag { font-size: 10px; font-weight: 800; color: #a86300; background: #fff2d6; border-radius: 5px; padding: 2px 7px; }
+    .ms-demo-x { margin-left: auto; border: none; background: #f2f4f6; color: #5f676f; width: 28px; height: 28px; border-radius: 50%; cursor: pointer; font-size: 13px; }
+    .ms-demo-sub { font-size: 12.5px; color: #7d8590; line-height: 1.55; margin: 0 0 16px; }
+    .ms-demo-card label { display: block; font-size: 12px; font-weight: 700; color: #5f676f; margin: 10px 0 5px; }
+    .ms-demo-card input { width: 100%; box-sizing: border-box; border: 1px solid #d6dbe2; border-radius: 8px; padding: 10px 12px; font-size: 14px; outline: none; }
+    .ms-demo-card input:focus { border-color: #2b6ef2; }
   </style>
 </head>
 <body>
@@ -45,50 +67,61 @@
     <div class="auth-card">
       <img src="/estfamily.png" alt="EST family" class="auth-logo" onerror="this.style.display='none'" />
       <div class="auth-sub">이스트소프트 사내 학습 플랫폼</div>
-      <div class="auth-tabs">
-        <button id="tabLogin" class="on" onclick="switchTab('login')">로그인</button>
-        <button id="tabSignup" onclick="switchTab('signup')">회원가입</button>
+
+      <div id="ssoMsg" class="auth-msg" style="margin:0 0 10px"></div>
+      <div id="ssoBox" style="display:none">
+        <a class="ms-btn" id="msBtn" href="/auth/teams/login">
+          <span class="ms-logo" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+          Microsoft Teams 계정으로 로그인
+        </a>
+        <div class="or-div"><span>또는 이메일로 로그인</span></div>
+      </div>
+
+      <!-- 데모 Microsoft 계정 선택 모달 -->
+      <div id="msDemoOv" class="ms-demo-ov">
+        <div class="ms-demo-card">
+          <div class="ms-demo-head">
+            <span class="ms-logo"><i></i><i></i><i></i><i></i></span>
+            <b>Microsoft 계정으로 로그인</b>
+            <span class="ms-demo-tag">데모</span>
+            <button class="ms-demo-x" onclick="closeMsDemo()" aria-label="닫기">✕</button>
+          </div>
+          <p class="ms-demo-sub">Teams/회사 계정을 선택하는 화면이에요. 실제 연동 전이라, 아래에 계정 정보를 입력하면 동일한 흐름(이메일·이름 자동완성 회원가입 → 역량진단)으로 이어집니다.</p>
+          <form id="msDemoForm" onsubmit="return msDemoSubmit(event)">
+            <label>회사 이메일</label>
+            <input id="msDemoEmail" type="email" placeholder="name@estsoft.com" required />
+            <label>이름</label>
+            <input id="msDemoName" type="text" placeholder="홍길동" required />
+            <button class="auth-btn" style="margin-top:14px" type="submit">이 계정으로 계속 →</button>
+            <div class="auth-msg" id="msDemoMsg"></div>
+          </form>
+        </div>
       </div>
 
       <form id="loginForm" onsubmit="return doLogin(event)">
         <div class="fld"><label>이메일</label><input id="liEmail" type="email" placeholder="name@estsoft.com" required /></div>
         <div class="fld"><label>비밀번호</label><input id="liPw" type="password" placeholder="비밀번호" required /></div>
         <button class="auth-btn">로그인</button>
-        <button type="button" class="auth-btn" style="background:#fff;color:#00a05d;border:1.5px solid #00c471;margin-top:8px" onclick="switchTab('signup')">회원가입</button>
         <div class="auth-msg" id="liMsg"></div>
       </form>
 
-      <form id="signupForm" style="display:none" onsubmit="return doSignup(event)">
-        <div class="fld"><label>계정 유형</label>
-          <div class="role-pick">
-            <label><input type="radio" name="suRole" value="user" checked />👤 사용자</label>
-            <label><input type="radio" name="suRole" value="admin" />🛠 관리자</label>
-          </div>
-        </div>
-        <div class="fld"><label>이름</label><input id="suName" placeholder="홍길동" required /></div>
-        <div class="fld"><label>이메일</label><input id="suEmail" type="email" placeholder="name@estsoft.com" required /></div>
-        <div class="row2">
-          <div class="fld"><label>사번 (UUID)</label><input id="suUuid" placeholder="예: es12" />
-            <div class="hint">인프런 수강 데이터와 연결됩니다</div></div>
-          <div class="fld"><label>소속</label><input id="suDept" placeholder="예: AI서비스팀" /></div>
-        </div>
-        <div class="fld"><label>비밀번호</label><input id="suPw" type="password" placeholder="4자 이상" required /></div>
-        <button class="auth-btn">계정 만들기</button>
-        <div class="auth-msg" id="suMsg"></div>
-      </form>
-
       <div class="demo-box">
-        <div class="demo-title">🔑 테스트 계정 (클릭하면 자동 입력)</div>
-        <button type="button" class="demo-acc" onclick="fillDemo('admin@test.com')">
+        <div class="demo-title">👤 계정 유형 선택 · 클릭하면 바로 로그인</div>
+        <button type="button" class="demo-acc" onclick="quickLogin('admin@test.com')">
           <span class="demo-role admin">관리자</span>
-          <span class="demo-mail">admin@test.com / test1234</span>
+          <span class="demo-mail">관리자로 로그인</span>
           <span class="demo-note">→ /admin 관리자 콘솔 진입</span>
         </button>
-        <button type="button" class="demo-acc" onclick="fillDemo('user@test.com')">
+        <button type="button" class="demo-acc" onclick="quickLogin('user@test.com')">
           <span class="demo-role">사용자</span>
-          <span class="demo-mail">user@test.com / test1234</span>
-          <span class="demo-note">→ /admin 접근 시 차단(리다이렉트)</span>
+          <span class="demo-mail">사용자로 로그인</span>
+          <span class="demo-note">→ 학습 화면 진입</span>
         </button>
+      </div>
+
+      <div class="start-box">
+        <span>처음이신가요?</span>
+        <a class="start-link" href="/onboarding">튜토리얼로 시작하기 (회원가입) →</a>
       </div>
     </div>
   </div>
@@ -96,12 +129,6 @@
   <script>
     const $ = (s) => document.querySelector(s);
     const nextUrl = new URLSearchParams(location.search).get('next');
-    function switchTab(t) {
-      $('#tabLogin').classList.toggle('on', t === 'login');
-      $('#tabSignup').classList.toggle('on', t === 'signup');
-      $('#loginForm').style.display = t === 'login' ? '' : 'none';
-      $('#signupForm').style.display = t === 'signup' ? '' : 'none';
-    }
     function landing(user) {
       if (nextUrl) return nextUrl;
       return '/#/'; // 사용자·관리자 동일 화면 (관리자는 메뉴바의 '관리자 대시보드' 버튼으로 진입)
@@ -122,29 +149,81 @@
       } catch (err) { msg.className = 'auth-msg err'; msg.textContent = err.message; }
       return false;
     }
-    async function doSignup(e) {
-      e.preventDefault();
-      const msg = $('#suMsg'); msg.className = 'auth-msg';
+    // 계정 유형(사용자/관리자) 선택 → 바로 로그인
+    async function quickLogin(email) {
+      const msg = $('#liMsg'); msg.className = 'auth-msg';
+      $('#liEmail').value = email; $('#liPw').value = 'test1234';
       try {
-        const { user } = await post('/api/auth/signup', {
-          name: $('#suName').value.trim(), email: $('#suEmail').value.trim(),
-          password: $('#suPw').value, uuid: $('#suUuid').value.trim(), dept: $('#suDept').value.trim(),
-          role: document.querySelector('input[name=suRole]:checked').value,
-        });
-        msg.className = 'auth-msg ok'; msg.textContent = '계정 생성 완료! 온보딩으로 이동합니다…';
-        location.href = user.role === 'admin' ? '/#/' : '/onboarding';
+        const { user } = await post('/api/auth/login', { email, password: 'test1234' });
+        msg.className = 'auth-msg ok'; msg.textContent = (user.role === 'admin' ? '관리자' : '사용자') + '로 로그인 중…';
+        location.href = landing(user);
+      } catch (err) { msg.className = 'auth-msg err'; msg.textContent = err.message; }
+    }
+    // SSO 콜백 실패/안내 메시지 (silent 로그인 실패 시 조용히 폴백)
+    const SSO_MSGS = {
+      disabled: 'Teams SSO가 설정되지 않았습니다. 관리자에게 문의하세요.',
+      login_required: '', interaction_required: '', consent_required: '',
+      token_bad: 'Teams 로그인 처리 중 오류가 발생했습니다. 다시 시도해 주세요.',
+      no_email: 'Microsoft 계정에서 이메일을 확인할 수 없습니다.',
+    };
+    const ssoParam = new URLSearchParams(location.search).get('sso');
+    if (ssoParam) {
+      const m = $('#ssoMsg');
+      const txt = SSO_MSGS[ssoParam] ?? ('Teams 로그인 실패 (' + ssoParam + ') — 이메일로 로그인해 주세요.');
+      if (txt) { m.className = 'auth-msg err'; m.textContent = txt; }
+      sessionStorage.setItem('ssoTried', '1'); // 실패 후 자동 재시도 방지
+    }
+
+    // 부팅: 로그인 상태 확인 → SSO 구성 확인 → (자동 로그인 or 버튼 노출)
+    (async function boot() {
+      try {
+        const me = await fetch('/api/auth/me');
+        if (me.ok) { const d = await me.json(); if (d && d.user) { location.href = landing(d.user); return; } }
+      } catch (e) {}
+      let cfg = {};
+      try { cfg = await fetch('/api/auth/config').then((r) => r.json()); } catch (e) {}
+      if (cfg.teamsSso) {
+        // 실제 SSO: 버튼이 Microsoft 로그인으로 이동
+        $('#ssoBox').style.display = 'block';
+        if (cfg.teamsSsoAuto && !sessionStorage.getItem('ssoTried') && !ssoParam) {
+          sessionStorage.setItem('ssoTried', '1');
+          location.href = '/auth/teams/login?silent=1';
+        }
+      } else if (cfg.teamsSsoDemo) {
+        // 데모 SSO: 버튼은 보이되, 클릭 시 데모 계정 선택 모달
+        $('#ssoBox').style.display = 'block';
+        const btn = $('#msBtn');
+        btn.setAttribute('href', '#');
+        btn.addEventListener('click', (e) => { e.preventDefault(); openMsDemo(); });
+      }
+    })();
+
+    // ---- 데모 Microsoft 로그인 ----
+    function openMsDemo() { $('#msDemoOv').classList.add('show'); setTimeout(() => $('#msDemoEmail').focus(), 40); }
+    function closeMsDemo() { $('#msDemoOv').classList.remove('show'); }
+    $('#msDemoOv').addEventListener('click', (e) => { if (e.target.id === 'msDemoOv') closeMsDemo(); });
+    async function msDemoSubmit(e) {
+      e.preventDefault();
+      const msg = $('#msDemoMsg'); msg.className = 'auth-msg';
+      const email = $('#msDemoEmail').value.trim(), name = $('#msDemoName').value.trim();
+      // 필수 입력 검증 — 정보를 넣지 않으면 진행 불가
+      if (!email || !name) { msg.className = 'auth-msg err'; msg.textContent = '이메일과 이름을 모두 입력해 주세요.'; return false; }
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { msg.className = 'auth-msg err'; msg.textContent = '올바른 이메일 형식이 아니에요.'; return false; }
+      try {
+        const r = await post('/auth/teams/demo', { email, name });
+        if (r.status === 'created' || r.needsOnboarding) {
+          // 신규 가입 또는 아직 역량진단 전 → 튜토리얼(→역량진단)로
+          msg.className = 'auth-msg ok';
+          msg.textContent = r.status === 'created' ? 'Teams 계정으로 가입 완료! 튜토리얼로 이동합니다…' : '처음이시네요! 튜토리얼로 이동합니다…';
+          location.href = '/onboarding';
+        } else {
+          // 기존(진단 완료) → 홈으로 로그인
+          msg.className = 'auth-msg ok'; msg.textContent = '로그인 중…';
+          location.href = landing({ role: r.role });
+        }
       } catch (err) { msg.className = 'auth-msg err'; msg.textContent = err.message; }
       return false;
     }
-    // 테스트 계정 자동 입력
-    function fillDemo(email) {
-      switchTab('login');
-      $('#liEmail').value = email;
-      $('#liPw').value = 'test1234';
-      const msg = $('#liMsg'); msg.className = 'auth-msg ok'; msg.textContent = '테스트 계정이 입력되었습니다 — 로그인을 누르세요';
-    }
-    // 이미 로그인 상태면 바로 이동
-    fetch('/api/auth/me').then((r) => r.ok ? r.json() : null).then((d) => { if (d && d.user) location.href = landing(d.user); }).catch(() => {});
   </script>
 </body>
 </html>

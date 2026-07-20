@@ -27,6 +27,22 @@ const TOKEN = process.env.INFLEARN_TOKEN;
 const PORT = Number(process.env.PORT) || 3000;
 const API_BASE = 'https://partners.inflearn.com/api/v1';
 
+// ---- Microsoft Teams/Entra ID SSO ----
+// 전용 앱(MICROSOFT_*)이 있으면 우선 사용, 없으면 조직도용 Azure 앱(AZURE_*) 재사용
+const SSO_TENANT = process.env.MICROSOFT_TENANT_ID || process.env.AZURE_TENANT_ID;
+const SSO_CLIENT_ID = process.env.MICROSOFT_APP_ID || process.env.AZURE_CLIENT_ID;
+const SSO_CLIENT_SECRET = process.env.MICROSOFT_APP_PASSWORD || process.env.AZURE_CLIENT_SECRET;
+const SSO_SCOPE = 'openid profile email User.Read';
+const SSO_HAS_CREDS = !!(SSO_TENANT && SSO_CLIENT_ID && SSO_CLIENT_SECRET);
+// 리디렉션 URI가 Azure에 등록되기 전까지는 버튼을 숨김(누르면 오류 페이지로 빠지므로).
+// IT가 앱·리디렉션 URI 세팅을 마치면 .env 에 TEAMS_SSO=1 한 줄로 켠다.
+const SSO_ENABLED = SSO_HAS_CREDS && ['1', 'true', 'True'].includes(process.env.TEAMS_SSO || '');
+// 자동(무프롬프트) 로그인 시도 여부 — SSO 활성 후 추가로 켤 수 있음.
+const SSO_AUTO = SSO_ENABLED && ['1', 'true', 'True'].includes(process.env.TEAMS_SSO_AUTO || '');
+// 데모 모드: 실제 Azure SSO가 꺼져 있을 때 UI 흐름을 시연하기 위한 목(mock) 로그인.
+// 실제 SSO(TEAMS_SSO=1)가 켜지면 자동으로 실제 로그인으로 전환됨. TEAMS_SSO_DEMO=0 으로 끌 수 있음.
+const SSO_DEMO = !SSO_ENABLED && !['0', 'false', 'False'].includes(process.env.TEAMS_SSO_DEMO || '');
+
 if (!TOKEN) {
   console.error('❌ INFLEARN_TOKEN 이 설정되지 않았습니다. .env 파일을 확인하세요.');
   process.exit(1);
@@ -98,11 +114,21 @@ async function inflearn(path, params = {}) {
   for (const [k, v] of Object.entries(params)) {
     if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, v);
   }
-  const res = await fetch(url, { headers: { Authorization: AUTH_HEADER } });
-  const text = await res.text();
-  let json;
-  try { json = JSON.parse(text); } catch { json = { code: 'PARSE_ERROR', message: text }; }
-  return { status: res.status, json };
+  // 일시적 네트워크 오류(fetch failed)에 대비해 최대 3회 재시도
+  let lastErr;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await fetch(url, { headers: { Authorization: AUTH_HEADER } });
+      const text = await res.text();
+      let json;
+      try { json = JSON.parse(text); } catch { json = { code: 'PARSE_ERROR', message: text }; }
+      return { status: res.status, json };
+    } catch (e) {
+      lastErr = e;
+      await new Promise((r) => setTimeout(r, 300 * (attempt + 1))); // 백오프 후 재시도
+    }
+  }
+  throw lastErr;
 }
 
 // 페이지네이션이 있는 목록 엔드포인트에서 전체 레코드 수집
@@ -214,9 +240,14 @@ async function getCatalog(force = false) {
   if (catalogCache.data && fresh && !force) return catalogCache.data;
   if (catalogCache.building) return catalogCache.building;
   catalogCache.building = (async () => {
-    const data = await buildCatalog();
-    catalogCache = { at: Date.now(), data, building: null };
-    return data;
+    try {
+      const data = await buildCatalog();
+      catalogCache = { at: Date.now(), data, building: null };
+      return data;
+    } catch (e) {
+      catalogCache.building = null; // 실패 시 초기화 → 다음 요청에서 재시도
+      throw e;
+    }
   })();
   return catalogCache.building;
 }
@@ -399,9 +430,14 @@ async function getDashboard(force = false) {
   if (cache.data && fresh && !force) return cache.data;
   if (cache.building) return cache.building;
   cache.building = (async () => {
-    const data = await buildDashboard();
-    cache = { at: Date.now(), data, building: null };
-    return data;
+    try {
+      const data = await buildDashboard();
+      cache = { at: Date.now(), data, building: null };
+      return data;
+    } catch (e) {
+      cache.building = null; // 실패 시 초기화 → 다음 요청에서 재시도 (캐시 오염 방지)
+      throw e;
+    }
   })();
   return cache.building;
 }
@@ -543,6 +579,166 @@ const server = createServer(async (req, res) => {
       if (!user) return sendJson(res, 401, { error: '로그인이 필요합니다' });
       return sendJson(res, 200, { user: publicUser(user) });
     }
+
+    // --- Teams/Microsoft(Entra ID) SSO 자동 로그인 (OAuth2 Authorization Code Flow) ---
+    // 클라이언트가 Teams SSO 사용 가능 여부를 확인
+    if (path === '/api/auth/config') {
+      return sendJson(res, 200, { teamsSso: SSO_ENABLED, teamsSsoAuto: SSO_ENABLED && SSO_AUTO, teamsSsoDemo: SSO_DEMO });
+    }
+    // 데모 Teams 로그인 — 실제 Azure 없이 UI 흐름 시연 (Microsoft 계정 로그인/가입을 시뮬레이션)
+    if (path === '/auth/teams/demo' && req.method === 'POST') {
+      if (!SSO_DEMO) return sendJson(res, 403, { error: '데모 SSO가 비활성 상태입니다' });
+      const { email, name, uuid, dept, role } = await readBody(req);
+      const em = String(email || '').trim().toLowerCase();
+      if (!em || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) return sendJson(res, 400, { error: '올바른 이메일을 입력해 주세요' });
+      let user = userStore.users.find((u) => u.email.toLowerCase() === em);
+      if (user) {
+        // 기존 계정 → 즉시 로그인 (역량진단 전이면 온보딩 튜토리얼로 안내)
+        setSessionCookie(res, makeSession(user));
+        return sendJson(res, 200, { status: 'login', role: user.role, needsOnboarding: user.role !== 'admin' && !user.assessment });
+      }
+      // 신규 → Teams 계정으로 자동 가입(데모) 후 로그인
+      user = {
+        name: String(name || '').trim() || em.split('@')[0],
+        email: em, uuid: uuid || null, dept: dept || null, phone: null,
+        role: role === 'admin' ? 'admin' : 'user',
+        pass: hashPassword(randomBytes(18).toString('hex')),
+        createdAt: new Date().toISOString(), sso: 'teams-demo',
+      };
+      userStore.users.push(user); saveUsers();
+      setSessionCookie(res, makeSession(user));
+      return sendJson(res, 200, { status: 'created', role: user.role });
+    }
+    // 1) 로그인 시작 → Microsoft 로그인 페이지로 리다이렉트 (?silent=1 → 무프롬프트 자동 로그인 시도)
+    if (path === '/auth/teams/login' && req.method === 'GET') {
+      if (!SSO_ENABLED) { res.writeHead(302, { Location: '/login?sso=disabled' }); return res.end(); }
+      const silent = url.searchParams.get('silent') === '1';
+      const proto = String(req.headers['x-forwarded-proto'] || 'http').split(',')[0].trim();
+      const redirectUri = `${proto}://${req.headers.host}/auth/teams/callback`;
+      const state = randomBytes(16).toString('hex');
+      const nonce = randomBytes(16).toString('hex');
+      // 서명된 임시 쿠키(10분)에 state/nonce/redirectUri 보관 — 서버 세션 저장소 불필요
+      const payload = b64url(JSON.stringify({ s: state, n: nonce, r: redirectUri, x: Date.now() + 6e5 }));
+      res.setHeader('Set-Cookie', `lms_oauth=${payload}.${hmac(payload)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=600`);
+      const authUrl = new URL(`https://login.microsoftonline.com/${SSO_TENANT}/oauth2/v2.0/authorize`);
+      authUrl.searchParams.set('client_id', SSO_CLIENT_ID);
+      authUrl.searchParams.set('response_type', 'code');
+      authUrl.searchParams.set('redirect_uri', redirectUri);
+      authUrl.searchParams.set('response_mode', 'query');
+      authUrl.searchParams.set('scope', SSO_SCOPE);
+      authUrl.searchParams.set('state', state);
+      authUrl.searchParams.set('nonce', nonce);
+      if (silent) authUrl.searchParams.set('prompt', 'none');
+      res.writeHead(302, { Location: authUrl.toString() });
+      return res.end();
+    }
+    // 2) 콜백 → code 교환 → id_token 파싱 → LMS 사용자 매칭/자동생성 → 세션 발급
+    if (path === '/auth/teams/callback' && req.method === 'GET') {
+      const fail = (reason) => {
+        res.setHeader('Set-Cookie', 'lms_oauth=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0');
+        res.writeHead(302, { Location: '/login?sso=' + encodeURIComponent(reason) });
+        return res.end();
+      };
+      const oauthErr = url.searchParams.get('error');
+      if (oauthErr) return fail(oauthErr); // 예: login_required (무프롬프트 실패)
+      const cm = (req.headers.cookie || '').match(/(?:^|;\s*)lms_oauth=([^;]+)/);
+      if (!cm) return fail('state_missing');
+      const [pl, sig] = cm[1].split('.');
+      if (!pl || sig !== hmac(pl)) return fail('state_bad');
+      let saved;
+      try { saved = JSON.parse(Buffer.from(pl, 'base64url').toString()); } catch { return fail('state_bad'); }
+      if (!saved.x || saved.x < Date.now()) return fail('state_expired');
+      if (url.searchParams.get('state') !== saved.s) return fail('state_mismatch');
+      const code = url.searchParams.get('code');
+      if (!code) return fail('no_code');
+      // 코드 → 토큰 교환 (서버-서버, HTTPS)
+      let tok;
+      try {
+        tok = await fetch(`https://login.microsoftonline.com/${SSO_TENANT}/oauth2/v2.0/token`, {
+          method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            client_id: SSO_CLIENT_ID, client_secret: SSO_CLIENT_SECRET,
+            grant_type: 'authorization_code', code, redirect_uri: saved.r, scope: SSO_SCOPE,
+          }),
+        }).then((r) => r.json());
+      } catch { return fail('token_request_failed'); }
+      if (!tok || !tok.id_token) return fail('token_' + ((tok && tok.error) || 'failed'));
+      let claims;
+      try { claims = JSON.parse(Buffer.from(tok.id_token.split('.')[1], 'base64url').toString()); } catch { return fail('token_bad'); }
+      // 신뢰 경계: 토큰은 Microsoft 토큰 엔드포인트에서 직접(HTTPS) 수신 → aud/nonce/exp 검증
+      if (claims.aud !== SSO_CLIENT_ID) return fail('aud');
+      if (claims.nonce && claims.nonce !== saved.n) return fail('nonce');
+      if (claims.exp && claims.exp * 1000 < Date.now()) return fail('expired');
+      const email = String(claims.preferred_username || claims.email || claims.upn || '').toLowerCase();
+      const name = claims.name || email;
+      if (!email) return fail('no_email');
+      // LMS 사용자 매칭 (없으면 자동 프로비저닝)
+      const user = userStore.users.find((u) => u.email.toLowerCase() === email);
+      if (user) {
+        // 기존 사용자 → 즉시 로그인 (역량진단 전 일반 사용자는 온보딩 튜토리얼로)
+        res.setHeader('Set-Cookie', [
+          'lms_oauth=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0',
+          `lms_sess=${makeSession(user)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${SESSION_MS / 1000}`,
+        ]);
+        const dest = (user.role !== 'admin' && !user.assessment) ? '/onboarding' : '/#/';
+        res.writeHead(302, { Location: dest });
+        return res.end();
+      }
+      // 신규 → Microsoft 정보(이메일·이름)를 서명 쿠키로 넘겨 회원가입 폼 자동완성
+      const pre = b64url(JSON.stringify({ e: email, n: name, o: claims.oid || null, x: Date.now() + 6e5 }));
+      res.setHeader('Set-Cookie', [
+        'lms_oauth=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0',
+        `lms_ssoprefill=${pre}.${hmac(pre)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=600`,
+      ]);
+      res.writeHead(302, { Location: '/onboarding?sso=signup' });
+      return res.end();
+    }
+    // SSO 프리필 조회 (회원가입 폼 자동완성용) — 이메일/이름 반환
+    if (path === '/api/auth/sso-prefill') {
+      const cm = (req.headers.cookie || '').match(/(?:^|;\s*)lms_ssoprefill=([^;]+)/);
+      if (!cm) return sendJson(res, 200, { prefill: null });
+      const [pl, sig] = cm[1].split('.');
+      if (!pl || sig !== hmac(pl)) return sendJson(res, 200, { prefill: null });
+      try {
+        const d = JSON.parse(Buffer.from(pl, 'base64url').toString());
+        if (!d.x || d.x < Date.now()) return sendJson(res, 200, { prefill: null });
+        return sendJson(res, 200, { prefill: { email: d.e, name: d.n } });
+      } catch { return sendJson(res, 200, { prefill: null }); }
+    }
+    // SSO 회원가입 완료 — 이메일은 서명 쿠키(신뢰값)에서만, 나머지(사번/소속/유형)는 폼에서
+    if (path === '/api/auth/sso-complete' && req.method === 'POST') {
+      const cm = (req.headers.cookie || '').match(/(?:^|;\s*)lms_ssoprefill=([^;]+)/);
+      if (!cm) return sendJson(res, 400, { error: 'Microsoft 연동 정보가 만료되었습니다. 다시 시도해 주세요.' });
+      const [pl, sig] = cm[1].split('.');
+      if (!pl || sig !== hmac(pl)) return sendJson(res, 400, { error: '연동 정보 검증에 실패했습니다.' });
+      let d;
+      try { d = JSON.parse(Buffer.from(pl, 'base64url').toString()); } catch { return sendJson(res, 400, { error: '연동 정보 오류' }); }
+      if (!d.x || d.x < Date.now()) return sendJson(res, 400, { error: 'Microsoft 연동 정보가 만료되었습니다.' });
+      const email = String(d.e).toLowerCase();
+      const body = await readBody(req);
+      let user = userStore.users.find((u) => u.email.toLowerCase() === email);
+      if (!user) {
+        user = {
+          name: (body.name && String(body.name).trim()) || d.n || email,
+          email, uuid: body.uuid || null, dept: body.dept || null, phone: null,
+          role: body.role === 'admin' ? 'admin' : 'user',
+          pass: hashPassword(randomBytes(18).toString('hex')), // SSO 계정: 무작위 비번
+          createdAt: new Date().toISOString(), sso: 'teams', oid: d.o || null,
+        };
+        userStore.users.push(user);
+      } else {
+        if (body.name) user.name = String(body.name).trim();
+        if (body.uuid !== undefined && body.uuid) user.uuid = body.uuid;
+        if (body.dept !== undefined && body.dept) user.dept = body.dept;
+      }
+      saveUsers();
+      res.setHeader('Set-Cookie', [
+        'lms_ssoprefill=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0',
+        `lms_sess=${makeSession(user)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${SESSION_MS / 1000}`,
+      ]);
+      return sendJson(res, 200, { user: publicUser(user) });
+    }
+
     if (path === '/api/auth/change-password' && req.method === 'POST') {
       const user = readSession(req);
       if (!user) return sendJson(res, 401, { error: '로그인이 필요합니다' });
