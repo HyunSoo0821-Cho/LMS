@@ -1102,10 +1102,44 @@
     let ORG = null;          // /api/admin/org 응답 캐시
     let ORG_TREE = [];       // 현재 렌더 기준 회사 트리 [{name, size, mapped, remindN, depts:[{name, idxs, mapped, remindN}]}]
     const SENT = new Map();  // email → 'HH:MM' (이번 세션 발송 기록)
-    const REMIND_MSG = '수강 신청/학습을 시작해 주세요! — EST family 학습 리마인드';
     const OG_NO_COMPANY = '(소속사 미지정)';
     const OG_UNASSIGNED = '(부서 미지정)';
     const OG_ROW_LIMIT = 200; // 부서당 최대 표시 인원
+    // 상황별 리마인드: 수강 기간 만료 임박(expiry) > 미학습 홍보(promo)
+    const EXPIRY_DAYS = 14;      // 만료 D-14 이내면 "학습 종료 예정" 알림 대상
+    let EXPIRY = new Map();      // uuid → { title, dLeft } (가장 임박한 미수료 수강권)
+    const PROMO_MSG = '[학습 추천] 아직 학습을 시작하지 않으셨어요! EST family LMS에서 6,000여 개 강의와 AI 역량진단 맞춤 추천을 만나보세요 🚀';
+    const expiryMsg = (ex) => `[학습 종료 예정] '${ex.title}' 수강 기간이 ${ex.dLeft <= 0 ? '오늘' : ex.dLeft + '일 후'} 종료돼요. 기간 내 학습을 완료해 주세요! — EST family LMS`;
+
+    // 대시보드 수강 데이터로 uuid별 만료 임박 수강권 계산
+    function buildExpiryMap() {
+      EXPIRY = new Map();
+      const now = Date.now(), day = 86400e3;
+      for (const e of ((DASH && DASH.enrollments) || [])) {
+        if (!e || !e.uuid || e.completed || !e.expiredAt) continue;
+        const t = Date.parse(e.expiredAt);
+        if (!Number.isFinite(t)) continue;
+        const dLeft = Math.ceil((t - now) / day);
+        if (dLeft < 0 || dLeft > EXPIRY_DAYS) continue;
+        const cur = EXPIRY.get(String(e.uuid));
+        if (!cur || dLeft < cur.dLeft) EXPIRY.set(String(e.uuid), { title: e.courseTitle, dLeft });
+      }
+    }
+    // 사람별 발송 계획: 종료 예정 알림이 홍보보다 우선
+    function planOf(p) {
+      if (!p) return null;
+      const ex = p.uuid && EXPIRY.get(String(p.uuid));
+      if (ex) return { rtype: 'expiry', label: '⏰ 종료예정 ' + (ex.dLeft <= 0 ? 'D-DAY' : 'D-' + ex.dLeft), message: expiryMsg(ex) };
+      if ((Number(p.enrollments) || 0) === 0 || (Number(p.avgProgress) || 0) === 0) {
+        return { rtype: 'promo', label: '📣 학습 홍보', message: PROMO_MSG };
+      }
+      return null;
+    }
+    const RTYPE_PILL = {
+      expiry: '<span class="pill bad">종료예정</span>',
+      promo: '<span class="pill prog">학습홍보</span>',
+      general: '<span class="pill zero">일반</span>',
+    };
 
     function hhmm() {
       const d = new Date(), p = (n) => String(n).padStart(2, '0');
@@ -1113,9 +1147,7 @@
     }
     function showOgMsg(t) { const m = $('#ogMsg'); m.textContent = t; m.classList.remove('hidden'); }
     function hideOgMsg() { $('#ogMsg').classList.add('hidden'); }
-    function remindEligible(p) {
-      return (Number(p.enrollments) || 0) === 0 || (Number(p.avgProgress) || 0) === 0;
-    }
+    function remindEligible(p) { return !!planOf(p); }
     function orgStatusPill(p) {
       const en = Number(p.enrollments) || 0;
       if (en === 0) return '<span class="pill zero">수강 없음</span>';
@@ -1130,7 +1162,14 @@
       $('#ogStatus').textContent = '조직도를 불러오는 중입니다… (Microsoft Graph 조회로 수 초 정도 걸릴 수 있습니다)';
       $('#ogContent').classList.add('hidden');
       try {
-        ORG = await api('/api/admin/org');
+        // 조직도 + (만료 임박 계산용) 대시보드 수강 데이터를 병렬 로드
+        const [org, dash] = await Promise.all([
+          api('/api/admin/org'),
+          DASH ? Promise.resolve(DASH) : api('/api/dashboard').catch(() => null),
+        ]);
+        ORG = org;
+        if (dash) DASH = dash;
+        buildExpiryMap();
         hideOgMsg();
         renderOrg();
         $('#ogStatus').classList.add('hidden');
@@ -1144,11 +1183,17 @@
     function renderOrg() {
       const list = (ORG && ORG.org) || [];
       const mapped = list.filter((p) => p && p.uuid).length;
-      const none = list.filter((p) => p && (Number(p.enrollments) || 0) === 0).length;
+      let expiryN = 0, promoN = 0;
+      list.forEach((p) => {
+        const pl = planOf(p);
+        if (pl?.rtype === 'expiry') expiryN++;
+        else if (pl?.rtype === 'promo') promoN++;
+      });
       $('#ogChips').innerHTML =
         `<span class="chip">전체 인원 <b class="num">${Number(ORG.count ?? list.length).toLocaleString()}</b></span>` +
         `<span class="chip">UUID 매핑 <b class="num">${mapped.toLocaleString()}명</b></span>` +
-        `<span class="chip">수강 이력 없음 <b class="num">${none.toLocaleString()}명</b></span>`;
+        `<span class="chip">⏰ 종료예정 알림 대상 <b class="num">${expiryN.toLocaleString()}명</b></span>` +
+        `<span class="chip">📣 학습 홍보 대상 <b class="num">${promoN.toLocaleString()}명</b></span>`;
       renderOrgGroups();
     }
 
@@ -1186,11 +1231,12 @@
 
     function orgPersonRowHTML(p, idx) {
       const sentAt = SENT.get(p.email);
+      const plan = planOf(p);
       let btn = '';
-      if (remindEligible(p)) {
+      if (plan) {
         btn = sentAt
           ? `<button class="btn sm" disabled style="opacity:.55">발송됨 ${esc(sentAt)}</button>`
-          : `<button class="btn sm og-remind" data-idx="${idx}">📨 리마인드</button>`;
+          : `<button class="btn sm og-remind${plan.rtype === 'expiry' ? ' danger' : ''}" data-idx="${idx}" title="${esc(plan.message)}">${plan.label}</button>`;
       }
       return `<div class="person-row" data-idx="${idx}">
         <div><b>${esc(p.name)}</b>${p.title ? ` <span class="muted" style="font-size:11.5px">${esc(p.title)}</span>` : ''}</div>
@@ -1282,20 +1328,26 @@
         ).join('') + '</tbody></table></div>';
     }
 
+    // targets: [{name,email,uuid,message,rtype}] — 사람별 상황에 맞는 메시지로 발송
     async function postRemind(targets) {
-      const j = await api('/api/admin/remind', { method: 'POST', body: JSON.stringify({ targets, message: REMIND_MSG }) });
+      const j = await api('/api/admin/remind', { method: 'POST', body: JSON.stringify({ targets }) });
       if (!j || !j.ok) throw new Error((j && (j.message || j.error)) || '발송 실패 (응답 확인 필요)');
       return j;
     }
+    const planTarget = (p) => {
+      const plan = planOf(p);
+      return plan ? { name: p.name, email: p.email, uuid: p.uuid ?? null, message: plan.message, rtype: plan.rtype } : null;
+    };
 
     async function sendRemindOne(idx, btn) {
       const p = (ORG.org || [])[idx];
-      if (!p) return;
+      const target = p && planTarget(p);
+      if (!target) return;
       hideOgMsg();
       btn.disabled = true;
       btn.textContent = '발송 중…';
       try {
-        await postRemind([{ name: p.name, email: p.email, uuid: p.uuid ?? null }]);
+        await postRemind([target]);
         const t = hhmm();
         SENT.set(p.email, t);
         btn.textContent = '발송됨 ' + t;
@@ -1304,7 +1356,7 @@
         loadReminders(true);
       } catch (e) {
         btn.disabled = false;
-        btn.textContent = '📨 리마인드';
+        btn.textContent = (planOf(p) || {}).label || '📨 리마인드';
         showOgMsg('리마인드 발송 실패: ' + e.message);
       }
     }
@@ -1318,8 +1370,8 @@
       const org = ORG.org || [];
       const targets = [];
       depts.forEach((d) => d.idxs.forEach((i) => {
-        const p = org[i];
-        if (p && remindEligible(p)) targets.push({ name: p.name, email: p.email, uuid: p.uuid ?? null });
+        const t = planTarget(org[i]); // 사람별 상황(종료예정/미학습)에 맞는 메시지로 자동 구성
+        if (t) targets.push(t);
       }));
       if (!targets.length) return;
       hideOgMsg();
@@ -1399,10 +1451,11 @@
           return;
         }
         body.innerHTML = '<div style="max-height:340px;overflow:auto"><table><thead>' +
-          '<tr><th>발송시각</th><th>이름</th><th>이메일</th><th>UUID</th><th>메시지</th><th>발송자</th><th>채널</th></tr></thead><tbody>' +
+          '<tr><th>발송시각</th><th>유형</th><th>이름</th><th>이메일</th><th>UUID</th><th>메시지</th><th>발송자</th><th>채널</th></tr></thead><tbody>' +
           rs.map((r) =>
             `<tr>
               <td class="num" style="white-space:nowrap">${r.sentAt ? esc(r.sentAt) : '<span class="muted">-</span>'}</td>
+              <td>${RTYPE_PILL[r.rtype] || RTYPE_PILL.general}</td>
               <td>${esc(r.name)}</td>
               <td>${esc(r.email)}</td>
               <td>${r.uuid ? esc(r.uuid) : '<span class="muted">-</span>'}</td>

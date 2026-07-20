@@ -43,13 +43,15 @@ const SSO_AUTO = SSO_ENABLED && ['1', 'true', 'True'].includes(process.env.TEAMS
 // 실제 SSO(TEAMS_SSO=1)가 켜지면 자동으로 실제 로그인으로 전환됨. TEAMS_SSO_DEMO=0 으로 끌 수 있음.
 const SSO_DEMO = !SSO_ENABLED && !['0', 'false', 'False'].includes(process.env.TEAMS_SSO_DEMO || '');
 
+// 토큰이 없어도 서버는 뜬다(정적 화면·로그인은 동작). 인프런 API 호출만 실패 처리.
+// (예전엔 process.exit(1) 했으나, Render 등에서 env 미설정 시 앱 전체가 크래시 → 화면 자체가 안 뜨는 문제가 있었음)
 if (!TOKEN) {
-  console.error('❌ INFLEARN_TOKEN 이 설정되지 않았습니다. .env 파일을 확인하세요.');
-  process.exit(1);
+  console.warn('⚠️  INFLEARN_TOKEN 이 설정되지 않았습니다. 인프런 강의/학습 데이터 기능은 비활성화됩니다.');
+  console.warn('    → Render 대시보드 Environment(또는 로컬 .env)에 INFLEARN_TOKEN 을 설정하세요.');
 }
 
 // 문서 규격: Authorization: Basic base64({Token})
-const AUTH_HEADER = 'Basic ' + Buffer.from(TOKEN).toString('base64');
+const AUTH_HEADER = TOKEN ? 'Basic ' + Buffer.from(TOKEN).toString('base64') : '';
 
 // ==== 계정/세션 (users.json 파일 저장소, 세션은 HMAC 서명 쿠키) ====
 const USERS_PATH = join(__dirname, 'users.json');
@@ -110,6 +112,7 @@ function readBody(req) {
 
 // ---- 인프런 API 호출 헬퍼 ----
 async function inflearn(path, params = {}) {
+  if (!AUTH_HEADER) return { status: 503, json: { code: 'NO_TOKEN', message: 'INFLEARN_TOKEN 미설정 — 인프런 API 비활성' } };
   const url = new URL(API_BASE + path);
   for (const [k, v] of Object.entries(params)) {
     if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, v);
@@ -842,12 +845,14 @@ const server = createServer(async (req, res) => {
     if (path === '/api/admin/remind' && req.method === 'POST') {
       const me = readSession(req);
       if (!me || me.role !== 'admin') return sendJson(res, 403, { error: '관리자 권한이 필요합니다' });
-      const { targets, message } = await readBody(req); // targets: [{name,email,uuid}]
+      // targets: [{name,email,uuid, message?, rtype?}] — 대상별 메시지/유형(만료예정 expiry · 학습홍보 promo · 일반 general) 지원
+      const { targets, message, rtype } = await readBody(req);
       if (!Array.isArray(targets) || !targets.length) return sendJson(res, 400, { error: '발송 대상(targets)이 필요합니다' });
       const list = loadReminds();
       const batch = targets.map((t) => ({
         name: t.name, email: t.email, uuid: t.uuid || null,
-        message: message || '수강 신청/학습을 시작해 주세요! — EST family 학습 리마인드',
+        rtype: t.rtype || rtype || 'general',
+        message: t.message || message || '수강 신청/학습을 시작해 주세요! — EST family 학습 리마인드',
         sentBy: me.email, sentAt: new Date().toISOString(), channel: 'teams(예정)·이메일(데모 기록)',
       }));
       list.push(...batch);
@@ -1729,9 +1734,9 @@ const server = createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => {
-  console.log(`\n✅ LMS 대시보드 서버 실행 중`);
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`\n✅ LMS 대시보드 서버 실행 중 (PORT ${PORT})`);
   console.log(`   → http://localhost:${PORT}`);
-  console.log(`   토큰 인증: Basic ${AUTH_HEADER.slice(6, 16)}... (base64)`);
+  console.log(`   인프런 토큰: ${AUTH_HEADER ? 'Basic ' + AUTH_HEADER.slice(6, 16) + '... (base64)' : '⚠️ 미설정'}`);
   console.log(`   Ctrl+C 로 종료\n`);
 });
