@@ -403,6 +403,7 @@
               </select>
               <select id="ilFilter">
                 <option value="all">전체</option>
+                <option value="ext">📅 연장요청 대기</option>
                 <option value="learning">학습중</option>
                 <option value="ready">수료증 발급 가능</option>
                 <option value="completed">이수 완료</option>
@@ -1759,14 +1760,17 @@
         $('#ilStatus').textContent = '로딩 실패: ' + e.message;
       }
     }
+    const ilExtPending = (r) => r.extension && r.extension.status === 'pending';
     function renderIlChips() {
       const done = IL.filter(ilIsDone).length;
       const ready = IL.filter((r) => !ilIsDone(r) && ilProgOf(r) >= 100).length;
       const learning = IL.length - done - ready;
+      const ext = IL.filter(ilExtPending).length;
       $('#ilChips').innerHTML =
         `<span class="chip">학습중 <b class="num">${learning}</b></span>` +
         `<span class="chip">수료증 발급 가능 <b class="num">${ready}</b></span>` +
         `<span class="chip">이수 완료 <b class="num">${done}</b></span>` +
+        (ext ? `<span class="chip" style="background:rgba(245,158,11,.14);color:#b6790f;border-color:#f0d089">📅 연장요청 대기 <b class="num">${ext}</b></span>` : '') +
         `<span class="chip">전체 <b class="num">${IL.length}</b></span>`;
     }
     function renderIlTable() {
@@ -1774,7 +1778,8 @@
       const q = $('#ilSearch').value.trim().toLowerCase();
       let rows = IL.slice();
       if (type) rows = rows.filter((r) => r.ltype === type);
-      if (f === 'learning') rows = rows.filter((r) => !ilIsDone(r) && ilProgOf(r) < 100);
+      if (f === 'ext') rows = rows.filter(ilExtPending);
+      else if (f === 'learning') rows = rows.filter((r) => !ilIsDone(r) && ilProgOf(r) < 100);
       else if (f === 'ready') rows = rows.filter((r) => !ilIsDone(r) && ilProgOf(r) >= 100);
       else if (f === 'completed') rows = rows.filter(ilIsDone);
       if (q) rows = rows.filter((r) => ((r.userName || '') + ' ' + (r.userEmail || '') + ' ' + (r.dept || '') + ' ' + (r.title || '')).toLowerCase().includes(q));
@@ -1790,26 +1795,36 @@
           <td>${esc(r.dept || '-')}</td>
           <td>${esc(r.ltype || '-')}</td>
           <td>${esc(r.title || '-')}${r.org ? ` <span class="muted" style="font-size:11px">(${esc(r.org)})</span>` : ''}</td>
-          <td class="num" style="white-space:nowrap;font-size:12px">${esc(r.startDate || '')}${r.endDate ? ' ~ ' + esc(r.endDate) : ''}</td>
+          <td class="num" style="white-space:nowrap;font-size:12px">${esc(r.startDate || '')}${r.endDate ? ' ~ ' + esc(r.endDate) : ''}${ilExtPending(r) ? `<div style="color:#b6790f;font-size:11px;font-weight:700;margin-top:2px">📅 연장요청 → ${esc(r.extension.newEndDate)}${r.extension.reason ? '<span class="muted" style="font-weight:400"> · ' + esc(r.extension.reason) + '</span>' : ''}</div>` : ''}</td>
           <td class="num">${r.hours ? esc(r.hours) + 'h' : '-'}</td>
           <td style="white-space:nowrap">${bar(ilProgOf(r))}</td>
           <td>${ilStatusPill(r)}</td>
           <td>${cert}</td>
-          <td><button class="btn sm danger" data-act="del" data-id="${r.id}">삭제</button></td>
+          <td style="white-space:nowrap">${ilExtPending(r) ? `<button class="btn sm primary" data-act="ext-approve" data-id="${r.id}">연장 승인</button> <button class="btn sm danger" data-act="ext-reject" data-id="${r.id}">거절</button> ` : ''}<button class="btn sm danger" data-act="del" data-id="${r.id}">삭제</button></td>
         </tr>`;
       }).join('') || `<tr><td colspan="11" class="muted" style="text-align:center;padding:28px">해당 조건의 개별학습 내역이 없습니다.</td></tr>`;
     }
     $('#ilTable').addEventListener('click', async (e) => {
-      const btn = e.target.closest('button[data-act="del"]');
+      const btn = e.target.closest('button[data-act]');
       if (!btn) return;
       const r = IL.find((x) => x.id === Number(btn.dataset.id));
       if (!r) return;
-      if (!confirm(`${r.userName || r.userEmail} 님의 "${r.title}" 개별학습 내역을 삭제할까요?`)) return;
+      const act = btn.dataset.act;
       try {
-        await api('/api/individual-learning?id=' + btn.dataset.id, { method: 'DELETE' });
-        toast('개별학습 내역을 삭제했습니다.', 'ok');
+        if (act === 'del') {
+          if (!confirm(`${r.userName || r.userEmail} 님의 "${r.title}" 개별학습 내역을 삭제할까요?`)) return;
+          await api('/api/individual-learning?id=' + r.id, { method: 'DELETE' });
+          toast('개별학습 내역을 삭제했습니다.', 'ok');
+        } else if (act === 'ext-approve') {
+          await api('/api/admin/individual-learning/extend-decide', { method: 'POST', body: JSON.stringify({ id: r.id, decision: 'approved' }) });
+          toast('기간 연장을 승인했습니다. (종료일 연장)', 'ok');
+        } else if (act === 'ext-reject') {
+          const reason = prompt('연장 거절 사유를 입력하세요 (선택):', ''); if (reason === null) return;
+          await api('/api/admin/individual-learning/extend-decide', { method: 'POST', body: JSON.stringify({ id: r.id, decision: 'rejected', reason }) });
+          toast('기간 연장을 거절했습니다.', 'ok');
+        } else return;
         loadIllearn();
-      } catch (err) { toast('삭제 실패: ' + err.message, 'err'); }
+      } catch (err) { toast('처리 실패: ' + err.message, 'err'); }
     });
     ['#ilType', '#ilFilter'].forEach((s) => $(s).addEventListener('change', renderIlTable));
     $('#ilSearch').addEventListener('input', renderIlTable);

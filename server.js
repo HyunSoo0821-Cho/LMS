@@ -1366,6 +1366,44 @@ const server = createServer(async (req, res) => {
       saveIL(db);
       return sendJson(res, 200, { ok: true, record: r });
     }
+    // 사용자: 학습(수강) 기간 연장 요청
+    if (path === '/api/individual-learning/extend' && req.method === 'POST') {
+      const me = readSession(req);
+      if (!me) return sendJson(res, 401, { error: '로그인이 필요합니다' });
+      const { id, newEndDate, reason } = await readBody(req);
+      const db = loadIL();
+      const r = db.records.find((x) => x.id === (Number(id) || id));
+      if (!r) return sendJson(res, 404, { error: '개별학습 내역을 찾을 수 없습니다' });
+      if (r.userEmail !== me.email) return sendJson(res, 403, { error: '본인 학습만 연장 요청할 수 있습니다' });
+      if (r.status === 'completed') return sendJson(res, 400, { error: '이수 완료된 학습은 연장할 수 없습니다' });
+      if (r.extension && r.extension.status === 'pending') return sendJson(res, 409, { error: '이미 연장 요청이 승인 대기 중입니다' });
+      if (!newEndDate) return sendJson(res, 400, { error: '연장 희망일을 선택해 주세요' });
+      if (r.endDate && String(newEndDate) <= String(r.endDate)) return sendJson(res, 400, { error: '연장 희망일은 현재 종료일 이후여야 합니다' });
+      r.extension = {
+        status: 'pending', currentEndDate: r.endDate || null, newEndDate: String(newEndDate),
+        reason: String(reason || '').slice(0, 300) || null,
+        requestedAt: new Date().toISOString(), decidedAt: null, decidedBy: null, decisionReason: null,
+      };
+      saveIL(db);
+      return sendJson(res, 200, { record: r });
+    }
+    // 관리자: 기간 연장 요청 승인/거절
+    if (path === '/api/admin/individual-learning/extend-decide' && req.method === 'POST') {
+      const me = readSession(req);
+      if (!me || me.role !== 'admin') return sendJson(res, 403, { error: '관리자 권한이 필요합니다' });
+      const { id, decision, reason } = await readBody(req);
+      if (!['approved', 'rejected'].includes(decision)) return sendJson(res, 400, { error: "decision은 'approved' 또는 'rejected' 여야 합니다" });
+      const db = loadIL();
+      const r = db.records.find((x) => x.id === (Number(id) || id));
+      if (!r || !r.extension || r.extension.status !== 'pending') return sendJson(res, 404, { error: '대기 중인 연장 요청이 없습니다' });
+      r.extension.status = decision;
+      r.extension.decidedAt = new Date().toISOString();
+      r.extension.decidedBy = me.email;
+      r.extension.decisionReason = decision === 'rejected' ? (String(reason || '').slice(0, 300) || null) : null;
+      if (decision === 'approved' && r.extension.newEndDate) r.endDate = r.extension.newEndDate; // 승인 시 종료일 연장
+      saveIL(db);
+      return sendJson(res, 200, { ok: true, record: r });
+    }
 
     // ==== 사내 개설 과정 (강좌 개설 · 학사운영 · 교육이수 관리) ====
     const CC_PATH = join(__dirname, 'custom-courses.json');

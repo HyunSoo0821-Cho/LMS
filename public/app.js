@@ -1775,13 +1775,63 @@ function ilCardHtml(r) {
     </div>
     ${done ? `<div class="il-note done">🎓 이수 완료 — 수료증이 발급되었습니다.${r.certNo ? ` <b>${esc(r.certNo)}</b>` : ''}${r.hours ? ` (인정시간 ${esc(String(r.hours))}h)` : ''}</div>`
       : prog >= 100 ? `<div class="il-note ok">✅ 학습률 100% 달성! 아래 버튼으로 <b>수료증을 발급</b>받으세요.</div>` : ''}
+    ${ilExtNote(r)}
     <div class="il-card-actions">
       ${!done && prog >= 100 ? `<button class="mini-btn" style="margin-top:0" onclick="issueIlCert(${r.id})">🎓 수료증 발급</button>` : ''}
       ${done ? `<button class="mini-btn" style="margin-top:0" onclick="showIlCert(${r.id})">🏅 수료증 보기</button>` : ''}
+      ${!done && !(r.extension && r.extension.status === 'pending') ? `<button class="btn-ghost-sm" onclick="toggleIlExtend(${r.id})">📅 기간 연장 요청</button>` : ''}
       ${!done ? `<button class="btn-ghost-sm" onclick="cancelIl(${r.id})">등록 삭제</button>` : ''}
+    </div>
+    <div id="ilExtBox${r.id}"></div>
+  </div>`;
+}
+// 기간 연장 요청 상태 안내
+function ilExtNote(r) {
+  const x = r.extension;
+  if (!x) return '';
+  if (x.status === 'pending') return `<div class="il-note wait">📅 기간 연장 <b>승인 대기중</b> — 희망 종료일 ${esc(x.newEndDate)}${x.reason ? ` · 사유: ${esc(x.reason)}` : ''}</div>`;
+  if (x.status === 'approved') return `<div class="il-note ok">📅 기간 연장 <b>승인됨</b> — 종료일이 ${esc(r.endDate)}까지 연장되었어요.</div>`;
+  if (x.status === 'rejected') return `<div class="il-note no">📅 기간 연장 <b>거절됨</b>${x.decisionReason ? ` — 사유: ${esc(x.decisionReason)}` : ''}. 필요하면 다시 요청하세요.</div>`;
+  return '';
+}
+function ilExtendFormHtml(r) {
+  const min = r.endDate || new Date().toISOString().slice(0, 10);
+  return `<div class="il-ext-form">
+    <div class="il-ext-grid">
+      <label class="il-ext-lb">연장 희망 종료일 <span style="color:#2b6ef2">*</span>
+        <input type="date" id="ilExtDate${r.id}" min="${esc(min)}" class="il-ext-in" /></label>
+      <label class="il-ext-lb">사유
+        <input type="text" id="ilExtReason${r.id}" class="il-ext-in" placeholder="예: 교육 일정 변경으로 기간 연장 필요" maxlength="300" /></label>
+    </div>
+    <div class="il-ext-actions">
+      <button class="btn-ghost-sm" onclick="toggleIlExtend(${r.id})">취소</button>
+      <button class="mini-btn" style="margin-top:0" onclick="submitIlExtend(${r.id})">연장 요청 보내기 →</button>
     </div>
   </div>`;
 }
+window.toggleIlExtend = (id) => {
+  const box = $('#ilExtBox' + id); if (!box) return;
+  const r = ilView.records.find((x) => x.id === id); if (!r) return;
+  box.innerHTML = box.innerHTML ? '' : ilExtendFormHtml(r);
+  if (box.innerHTML) setTimeout(() => $('#ilExtDate' + id)?.focus(), 30);
+};
+window.submitIlExtend = async (id) => {
+  const date = $('#ilExtDate' + id)?.value;
+  const reason = $('#ilExtReason' + id)?.value.trim();
+  if (!date) { toast('연장 희망 종료일을 선택해 주세요'); return; }
+  try {
+    const r = await fetch('/api/individual-learning/extend', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, newEndDate: date, reason }),
+    });
+    const j = await r.json();
+    if (!r.ok) { toast('요청 실패: ' + (j.error || r.status)); return; }
+    const i = ilView.records.findIndex((x) => x.id === id);
+    if (i >= 0) ilView.records[i] = j.record;
+    drawIllearn();
+    toast('기간 연장 요청을 보냈습니다. 관리자 승인을 기다려 주세요 📅');
+  } catch (e) { toast('요청 실패: ' + e.message); }
+};
 
 window.toggleIlForm = () => {
   ilView.form = !ilView.form;
@@ -2267,7 +2317,14 @@ textarea.il-input{resize:vertical}
 .il-note.done{background:#eafff4;color:#00794b;border:1px solid #cdeede}
 .il-result{margin-top:12px;background:#f7f9fb;border:1px solid #e7e9ee;border-radius:10px;padding:12px 14px;font-size:13.5px;color:#40454d;line-height:1.7}
 .il-result b{display:block;font-size:12px;color:#8b93a1;margin-bottom:4px}
-.il-card-actions{display:flex;gap:8px;margin-top:14px}
+.il-card-actions{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+.il-ext-form{margin-top:12px;background:#f7f9fb;border:1px solid #e7e9ee;border-radius:10px;padding:14px}
+.il-ext-grid{display:grid;grid-template-columns:200px 1fr;gap:12px}
+@media(max-width:620px){.il-ext-grid{grid-template-columns:1fr}}
+.il-ext-lb{display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:700;color:#5f676f}
+.il-ext-in{border:1px solid #d6dbe2;border-radius:8px;padding:9px 11px;font-size:13.5px;font-family:inherit}
+.il-ext-in:focus{outline:none;border-color:#2b6ef2}
+.il-ext-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
 .rec-banner{background:#fff;border:1px solid #e7e9ee;border-radius:16px;padding:18px 20px 10px;margin:18px 0;box-shadow:0 2px 12px rgba(20,30,60,.05)}
 .rec-banner.empty{display:flex;flex-direction:column;gap:8px;align-items:flex-start;background:#f7f9fb}
 .rb-head{font-size:16px;font-weight:800;display:flex;align-items:center;gap:10px;flex-wrap:wrap;color:#1a1c1f}
