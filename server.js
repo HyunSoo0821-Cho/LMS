@@ -483,13 +483,15 @@ function sendJson(res, status, obj) {
 }
 
 // ---- 조직도 구성 (Microsoft Graph) — 라우트와 엑셀 내보내기에서 공용 ----
+// 대분류는 ESTsoft / ESTsecurity 두 개만 사용한다.
+// security 계열은 ESTsecurity, 그 외 EST family 계열(게임즈·에이드·라운즈·익스포넨셜 등)은 모두 ESTsoft로 통합.
 const COMPANY_MAP = {
   estsoft: 'ESTsoft', 이스트소프트: 'ESTsoft',
-  estgames: 'ESTgames', 이스트게임즈: 'ESTgames',
-  estaid: 'ESTaid', 이스트에이드: 'ESTaid',
+  estgames: 'ESTsoft', 이스트게임즈: 'ESTsoft',
+  estaid: 'ESTsoft', 이스트에이드: 'ESTsoft',
   estsecurity: 'ESTsecurity', 이스트시큐리티: 'ESTsecurity',
-  rounz: 'Rounz', 라운즈: 'Rounz',
-  exponential: 'Exponential', 익스포넨셜: 'Exponential',
+  rounz: 'ESTsoft', 라운즈: 'ESTsoft',
+  exponential: 'ESTsoft', 익스포넨셜: 'ESTsoft',
 };
 // 조직도 명단 파일(org-data.json — 엑셀 "조직도 전체" 시트에서 추출)이 있으면 Graph 대신 사용.
 // 대분야(회사)는 ESTsoft / ESTsecurity 두 개로만 분류한다.
