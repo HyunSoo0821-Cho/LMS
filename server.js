@@ -1253,8 +1253,21 @@ const server = createServer(async (req, res) => {
 
     // ==== 개별학습(사외교육·자격증·학위) 사전신청 → 승인 → 결과보고 → 이수 ====
     const IL_PATH = join(__dirname, 'individual-learning.json');
-    const loadIL = () => existsSync(IL_PATH) ? JSON.parse(readFileSync(IL_PATH, 'utf8')) : { seq: 1, records: [] };
     const saveIL = (db) => writeFileSync(IL_PATH, JSON.stringify(db, null, 2));
+    // 데모 시드 — 개별학습 파일이 없는 새 환경(라이브 등)에서 자동 주입 (가짜 데이터·PII 아님)
+    const IL_DEMO_SEED = [
+      { ltype: '사외교육', title: 'AWS Summit Seoul 2026 참관', category: '클라우드', org: 'AWS Korea', place: '코엑스', startDate: '2026-07-08', endDate: '2026-07-09', completeDate: null, hours: 8, cost: 0, insurance: '해당없음', content: 'AWS 최신 클라우드 트렌드·사례 세션 참관', attachment: null, userEmail: 'user@test.com', userName: '테스트사용자', uuid: 'es12', dept: '경영지원팀', status: 'in_progress', progress: 100, certNo: null, certIssuedAt: null, requestedAt: '2026-07-07T09:00:00.000Z', extension: null },
+      { ltype: '사외교육', title: '실무 데이터 분석 부트캠프', category: '데이터', org: '패스트캠퍼스', place: '서울 강남 캠퍼스', startDate: '2026-07-06', endDate: '2026-08-28', completeDate: null, hours: 30, cost: 450000, insurance: '해당없음', content: 'Python·SQL 기반 실무 데이터 분석 8주 과정', attachment: null, userEmail: 'user@test.com', userName: '테스트사용자', uuid: 'es12', dept: '경영지원팀', status: 'in_progress', progress: 20, certNo: null, certIssuedAt: null, requestedAt: '2026-07-06T09:00:00.000Z', extension: null },
+      { ltype: '자격증', title: 'SQLD (SQL 개발자)', category: '데이터', org: '한국데이터산업진흥원', place: '온라인', startDate: '2026-06-06', endDate: '2026-06-06', completeDate: '2026-07-10', hours: 24, cost: 50000, insurance: '해당없음', content: 'SQL 개발자 자격 취득', attachment: null, userEmail: 'demo.dev1@example.com', userName: '김도윤', uuid: null, dept: '개발팀', status: 'completed', progress: 100, certNo: 'IL-2026-0005', certIssuedAt: '2026-07-10T00:00:00.000Z', requestedAt: '2026-06-05T09:00:00.000Z', extension: null },
+      { ltype: '사외교육', title: '모던 프론트엔드 개발 워크숍 (React 심화)', category: '개발', org: '인프콘 아카데미', place: '온라인', startDate: '2026-06-15', endDate: '2026-06-16', completeDate: '2026-07-09', hours: 16, cost: 120000, insurance: '해당없음', content: 'React 심화·상태관리·성능 최적화', attachment: null, userEmail: 'demo.dev2@example.com', userName: '이서연', uuid: null, dept: '개발팀', status: 'completed', progress: 100, certNo: 'IL-2026-0006', certIssuedAt: '2026-07-09T00:00:00.000Z', requestedAt: '2026-06-14T09:00:00.000Z', extension: null },
+      { ltype: '자격증', title: '정보처리기사', category: '개발', org: '한국산업인력공단(큐넷)', place: '온라인', startDate: '2026-07-01', endDate: '2026-08-22', completeDate: null, hours: 40, cost: 0, insurance: '해당없음', content: '정보처리기사 필기·실기 대비', attachment: null, userEmail: 'demo.dev3@example.com', userName: '박지우', uuid: null, dept: 'TF개발', status: 'in_progress', progress: 60, certNo: null, certIssuedAt: null, requestedAt: '2026-07-01T09:00:00.000Z', extension: null },
+    ];
+    const loadIL = () => {
+      if (existsSync(IL_PATH)) return JSON.parse(readFileSync(IL_PATH, 'utf8'));
+      const db = { seq: IL_DEMO_SEED.length + 1, records: IL_DEMO_SEED.map((r, i) => ({ id: i + 1, ...r })) };
+      saveIL(db);
+      return db;
+    };
     const IL_TYPES = ['사외교육', '자격증', '학위'];
 
     // 사용자 본인 개별학습 목록
