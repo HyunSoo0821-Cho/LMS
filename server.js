@@ -76,9 +76,33 @@ function checkPassword(pw, stored) {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
+// 데모 계정 자동 시드 — Render 등 파일시스템이 배포마다 초기화되는 환경에서도
+// 로그인 페이지의 "관리자/사용자로 로그인" 버튼(비밀번호 test1234)이 항상 동작하도록 보장.
+(function seedDemoAccounts() {
+  const demos = [
+    { name: '테스트관리자', email: 'admin@test.com', uuid: 'es12', role: 'admin' },
+    { name: '테스트사용자', email: 'user@test.com', uuid: 'es20', role: 'user' },
+  ];
+  let changed = false;
+  for (const d of demos) {
+    if (!userStore.users.some((u) => u.email.toLowerCase() === d.email)) {
+      userStore.users.push({
+        name: d.name, email: d.email, uuid: d.uuid, dept: null, phone: null,
+        role: d.role, pass: hashPassword('test1234'),
+        createdAt: new Date().toISOString(), seeded: true,
+      });
+      changed = true;
+    }
+  }
+  if (changed) saveUsers();
+})();
+
 const SESSION_MS = 12 * 60 * 60 * 1000; // 12시간
+// 세션 서명 키: 환경변수(SESSION_SECRET)가 있으면 우선 사용 → Render 재배포에도 세션 유지.
+// 없으면 users.json에 저장된 키 사용(로컬).
+const SESSION_SECRET = process.env.SESSION_SECRET || userStore.secret;
 const b64url = (s) => Buffer.from(s).toString('base64url');
-const hmac = (s) => createHmac('sha256', userStore.secret).update(s).digest('base64url');
+const hmac = (s) => createHmac('sha256', SESSION_SECRET).update(s).digest('base64url');
 function makeSession(user) {
   const payload = b64url(JSON.stringify({ e: user.email, r: user.role, x: Date.now() + SESSION_MS }));
   return payload + '.' + hmac(payload);

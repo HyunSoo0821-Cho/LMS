@@ -107,12 +107,12 @@
 
       <div class="demo-box">
         <div class="demo-title">👤 계정 유형 선택 · 클릭하면 바로 로그인</div>
-        <button type="button" class="demo-acc" onclick="quickLogin('admin@test.com')">
+        <button type="button" class="demo-acc" data-demo="admin@test.com">
           <span class="demo-role admin">관리자</span>
           <span class="demo-mail">관리자로 로그인</span>
           <span class="demo-note">→ /admin 관리자 콘솔 진입</span>
         </button>
-        <button type="button" class="demo-acc" onclick="quickLogin('user@test.com')">
+        <button type="button" class="demo-acc" data-demo="user@test.com">
           <span class="demo-role">사용자</span>
           <span class="demo-mail">사용자로 로그인</span>
           <span class="demo-note">→ 학습 화면 진입</span>
@@ -149,16 +149,24 @@
       } catch (err) { msg.className = 'auth-msg err'; msg.textContent = err.message; }
       return false;
     }
-    // 계정 유형(사용자/관리자) 선택 → 바로 로그인
+    // 계정 유형(사용자/관리자) 선택 → 자동 기입 + 바로 로그인
     async function quickLogin(email) {
       const msg = $('#liMsg'); msg.className = 'auth-msg';
-      $('#liEmail').value = email; $('#liPw').value = 'test1234';
+      const em = $('#liEmail'), pw = $('#liPw');
+      if (em) em.value = email;
+      if (pw) pw.value = 'test1234';
+      msg.className = 'auth-msg ok'; msg.textContent = '로그인 중…';
       try {
         const { user } = await post('/api/auth/login', { email, password: 'test1234' });
         msg.className = 'auth-msg ok'; msg.textContent = (user.role === 'admin' ? '관리자' : '사용자') + '로 로그인 중…';
         location.href = landing(user);
       } catch (err) { msg.className = 'auth-msg err'; msg.textContent = err.message; }
     }
+    window.quickLogin = quickLogin;
+    // 인라인 onclick 대신 이벤트 위임으로 바인딩(스크립트 상단에서 오류가 나도 버튼은 동작)
+    document.querySelectorAll('.demo-acc[data-demo]').forEach((b) => {
+      b.addEventListener('click', () => quickLogin(b.getAttribute('data-demo')));
+    });
     // SSO 콜백 실패/안내 메시지 (silent 로그인 실패 시 조용히 폴백)
     const SSO_MSGS = {
       disabled: 'Teams SSO가 설정되지 않았습니다. 관리자에게 문의하세요.',
